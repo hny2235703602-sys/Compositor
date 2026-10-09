@@ -185,7 +185,7 @@ nonisolated struct LayerAdjustment: Codable, Equatable, Sendable {
 extension EditorSession {
     func addAdjustment(_ kind: AdjustmentKind) {
         guard canEditLayers, let document, document.layers.count < 10_000 else { return }
-        var layer = ImageLayer(name: kind.rawValue, blankSize: document.size)
+        var layer = ImageLayer(name: uiName(kind.rawValue), blankSize: document.size)
         var adjustment = LayerAdjustment(kind: kind)
         // A new Gradient Map runs from the foreground to the background color, as in Photoshop;
         // each Grain layer gets a pattern of its own.
@@ -205,6 +205,7 @@ extension EditorSession {
         // Invert has nothing to set, so the new layer just applies rather than opening an editor.
         if kind.isEditable { adjustmentEditingID = layer.id }
     }
+
     func updateAdjustment(_ id: UUID, value: LayerAdjustment) {
         guard let index = document?.layers.firstIndex(where: { $0.id == id }), value.isValid else { return }
         document?.layers[index].adjustment = value

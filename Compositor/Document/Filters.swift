@@ -647,6 +647,7 @@ extension EditorSession {
         do {
             let grown = edit.grownTransform
             let spreads = edit.kind == .gaussianBlur || edit.kind == .motionBlur || edit.kind == .bloomGlow
+            let filterName = uiName(job.kind.rawValue)
             let made = try await Task.detached(priority: .userInitiated) { () -> (asset: ImportedImage, transform: LayerTransform?) in
                 var image = try cached ?? PixelFilter.run(job)
                 var placed = grown
@@ -655,7 +656,7 @@ extension EditorSession {
                     image = trimmed.image
                     placed = trimmed.transform
                 }
-                return (ImportedImage(image: image, thumbnail: try PixelAdjust.thumbnail(of: image), name: job.kind.rawValue), placed)
+                return (ImportedImage(image: image, thumbnail: try PixelAdjust.thumbnail(of: image), name: filterName), placed)
             }.value
             let asset = made.asset
             guard let index = document?.layers.firstIndex(where: { $0.id == edit.layerID }),
