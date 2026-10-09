@@ -1,0 +1,285 @@
+{
+  "looks": [
+    {
+      "id": "clear",
+      "title": "Clear",
+      "use": "Gray, hazy, or muddy. Not a saturation boost and not opacity.",
+      "phrases": ["通透", "不通透", "发灰", "发闷", "灰蒙", "灰蒙蒙", "去雾", "去薄雾", "去朦胧"],
+      "settings": { "dehaze": 18, "clarity": 12, "contrast": 12, "shadows": 18, "blacks": -10, "vibrance": 10 }
+    },
+    {
+      "id": "crisp",
+      "title": "Crisp",
+      "use": "Sharper edges and texture. Not the same as 通透.",
+      "phrases": ["更清晰", "清楚一点", "锐一点", "加清晰度", "增强细节"],
+      "settings": { "clarity": 22, "texture": 16, "dehaze": 8 }
+    },
+    {
+      "id": "soft",
+      "title": "Soft",
+      "use": "The opposite of clear: haze and softer midtones.",
+      "phrases": ["柔和", "梦幻", "雾化", "朦胧", "柔焦", "加雾"],
+      "settings": { "clarity": -18, "dehaze": -15, "contrast": -8 }
+    },
+    {
+      "id": "dark",
+      "title": "Dark Tone",
+      "use": "Low-key. Darker overall, with some highlight left.",
+      "phrases": ["暗色调", "暗调", "低调", "压暗"],
+      "settings": { "exposure": -0.45, "contrast": 12, "highlights": -15, "shadows": -12, "blacks": -25 }
+    },
+    {
+      "id": "bright",
+      "title": "Bright Tone",
+      "use": "High-key. Lift the frame and hold the highlights.",
+      "phrases": ["亮色调", "高调", "亮调"],
+      "settings": { "exposure": 0.35, "highlights": -12, "shadows": 22, "blacks": 12 }
+    },
+    {
+      "id": "lift",
+      "title": "Lift Exposure",
+      "use": "The picture is too dark. A plain exposure lift, not a high-key look.",
+      "phrases": ["太暗", "曝光不足", "欠曝", "提亮", "亮一点"],
+      "settings": { "exposure": 0.4, "shadows": 12 }
+    },
+    {
+      "id": "dim",
+      "title": "Lower Exposure",
+      "use": "The picture is too bright. A plain exposure drop, not a low-key look.",
+      "phrases": ["太亮", "曝光过度", "过曝", "降低曝光"],
+      "settings": { "exposure": -0.4, "highlights": -12 }
+    },
+    {
+      "id": "cool",
+      "title": "Cool Tone",
+      "use": "Shift the whole frame toward blue.",
+      "phrases": ["冷色调", "冷调", "偏冷", "再冷一点"],
+      "settings": { "temperature": -30 }
+    },
+    {
+      "id": "warm",
+      "title": "Warm Tone",
+      "use": "Shift the whole frame toward yellow.",
+      "phrases": ["暖色调", "暖调", "偏暖", "再暖一点"],
+      "settings": { "temperature": 30 }
+    },
+    {
+      "id": "cool_white",
+      "title": "Cool White",
+      "use": "Clean and slightly cold, not a deep blue grade.",
+      "phrases": ["冷白", "清冷", "冷白皮"],
+      "settings": { "temperature": -16, "exposure": 0.15, "contrast": 6, "vibrance": -8, "highlights": -8 }
+    },
+    {
+      "id": "black_gold",
+      "title": "Black and Gold",
+      "use": "Dark frame, gold in the highlights, deep blacks.",
+      "phrases": ["黑金色调", "黑金风", "黑金"],
+      "settings": { "exposure": -0.4, "contrast": 18, "highlights": -20, "shadows": -22, "blacks": -30, "temperature": 18, "vibrance": 8, "clarity": 8 },
+      "grading": {
+        "highlights": { "hue": 42, "saturation": 30, "luminance": 6 },
+        "shadows": { "hue": 35, "saturation": 12, "luminance": -18 }
+      }
+    },
+    {
+      "id": "teal_orange",
+      "title": "Teal and Orange",
+      "use": "Teal shadows and orange highlights.",
+      "phrases": ["青橙色调", "橙青色调", "青橙", "橙青"],
+      "settings": { "contrast": 12, "highlights": -12, "shadows": -8, "vibrance": 8 },
+      "grading": {
+        "highlights": { "hue": 32, "saturation": 28, "luminance": 4 },
+        "shadows": { "hue": 185, "saturation": 26, "luminance": -8 }
+      }
+    },
+    {
+      "id": "cinematic",
+      "title": "Cinematic",
+      "use": "Darker, higher contrast, muted color, darkened edges.",
+      "phrases": ["电影感", "电影调", "电影色"],
+      "settings": { "exposure": -0.25, "contrast": 16, "highlights": -18, "shadows": -10, "blacks": -16, "saturation": -8, "temperature": -6, "vignette": -22 }
+    },
+    {
+      "id": "film",
+      "title": "Film",
+      "use": "Lifted blacks, softer color, a little grain.",
+      "phrases": ["胶片感", "胶片色", "胶片"],
+      "settings": { "contrast": -8, "blacks": 14, "saturation": -12, "temperature": 8, "clarity": -6, "grain": 18 }
+    },
+    {
+      "id": "japanese",
+      "title": "Japanese Airy",
+      "use": "Light, soft, slightly warm, low contrast.",
+      "phrases": ["日系清新", "日系", "小清新", "清新"],
+      "settings": { "exposure": 0.2, "contrast": -10, "highlights": -8, "shadows": 18, "temperature": 6, "saturation": -8, "clarity": -8 }
+    },
+    {
+      "id": "vintage",
+      "title": "Vintage",
+      "use": "Faded color, warm, lifted blacks, a little grain and vignette.",
+      "phrases": ["复古", "怀旧", "老照片"],
+      "settings": { "contrast": -6, "blacks": 16, "saturation": -18, "temperature": 12, "grain": 12, "vignette": -16 }
+    },
+    {
+      "id": "faded",
+      "title": "Faded",
+      "use": "Washed out: lower contrast, lifted blacks, less color.",
+      "phrases": ["褪色感", "褪色", "发白"],
+      "settings": { "contrast": -14, "blacks": 22, "saturation": -16, "dehaze": -8 }
+    },
+    {
+      "id": "french",
+      "title": "French Soft",
+      "use": "Soft, slightly warm, lifted blacks.",
+      "phrases": ["法式复古", "法式"],
+      "settings": { "exposure": 0.1, "contrast": -8, "blacks": 10, "temperature": 8, "saturation": -10, "clarity": -6 }
+    },
+    {
+      "id": "vivid",
+      "title": "Vivid",
+      "use": "Richer color. Prefer vibrance over a heavy saturation push.",
+      "phrases": ["鲜艳", "艳丽", "饱和一点", "颜色浓"],
+      "settings": { "vibrance": 28, "saturation": 10, "contrast": 8 }
+    },
+    {
+      "id": "muted",
+      "title": "Muted",
+      "use": "Quieter color, including gray-green fashion tones.",
+      "phrases": ["低饱和", "莫兰迪", "高级灰", "颜色淡", "淡一点"],
+      "settings": { "vibrance": -25, "saturation": -16, "contrast": -6 }
+    },
+    {
+      "id": "black_white",
+      "title": "Black and White",
+      "use": "Remove the color.",
+      "phrases": ["黑白照", "黑白", "去色"],
+      "settings": { "saturation": -100, "contrast": 8 }
+    },
+    {
+      "id": "contrasty",
+      "title": "High Contrast",
+      "use": "Stronger separation of light and dark.",
+      "phrases": ["高对比", "对比强", "加强对比", "对比度高"],
+      "settings": { "contrast": 28, "clarity": 8, "blacks": -8 }
+    },
+    {
+      "id": "golden_hour",
+      "title": "Golden Hour",
+      "use": "Warm sunlight, not a flat yellow cast.",
+      "phrases": ["金色时刻", "黄金时刻", "暖阳", "夕阳色"],
+      "settings": { "temperature": 26, "exposure": 0.1, "highlights": -12, "shadows": 8, "vibrance": 10 },
+      "grading": { "highlights": { "hue": 40, "saturation": 22, "luminance": 6 } }
+    },
+    {
+      "id": "autumn",
+      "title": "Autumn",
+      "use": "Warm reds and yellows, slightly deeper shadows.",
+      "phrases": ["秋日色", "秋天色", "秋色", "枫叶色"],
+      "settings": { "temperature": 20, "vibrance": 12, "saturation": 6, "highlights": -8 },
+      "grading": {
+        "highlights": { "hue": 28, "saturation": 20 },
+        "shadows": { "hue": 18, "saturation": 12, "luminance": -6 }
+      }
+    },
+    {
+      "id": "hong_kong",
+      "title": "Hong Kong",
+      "use": "Contrast, a warm highlight, and a green-teal shadow.",
+      "phrases": ["港风", "港式"],
+      "settings": { "contrast": 14, "saturation": 6, "temperature": 8, "highlights": -10, "shadows": -8 },
+      "grading": {
+        "highlights": { "hue": 30, "saturation": 18 },
+        "shadows": { "hue": 175, "saturation": 18, "luminance": -6 }
+      }
+    },
+    {
+      "id": "cyber",
+      "title": "Cyber",
+      "use": "Cool darks with magenta highlights.",
+      "phrases": ["赛博朋克", "赛博", "霓虹"],
+      "settings": { "temperature": -16, "contrast": 20, "saturation": 8, "blacks": -16, "highlights": -12 },
+      "grading": {
+        "highlights": { "hue": 300, "saturation": 28 },
+        "shadows": { "hue": 195, "saturation": 30, "luminance": -8 }
+      }
+    },
+    {
+      "id": "night",
+      "title": "Night",
+      "use": "Dark and slightly cool, as a night frame.",
+      "phrases": ["夜景", "夜色", "夜晚"],
+      "settings": { "exposure": -0.7, "contrast": 10, "temperature": -12, "highlights": -20, "blacks": -12, "shadows": -6 }
+    },
+    {
+      "id": "overcast",
+      "title": "Overcast",
+      "use": "Flat, cool, a little gray.",
+      "phrases": ["阴天感", "阴天", "灰调"],
+      "settings": { "temperature": -8, "contrast": -6, "saturation": -10, "shadows": 10, "dehaze": -6 }
+    },
+    {
+      "id": "pink",
+      "title": "Pink",
+      "use": "A light pink cast.",
+      "phrases": ["粉色调", "粉调", "樱花粉"],
+      "settings": { "temperature": 8, "tint": 8, "vibrance": 6 },
+      "grading": { "highlights": { "hue": 345, "saturation": 16 } }
+    },
+    {
+      "id": "blue",
+      "title": "Blue",
+      "use": "A blue cast, stronger than a mild cool shift.",
+      "phrases": ["蓝色调", "蓝调"],
+      "settings": { "temperature": -24, "tint": -4, "vibrance": 6 }
+    },
+    {
+      "id": "green",
+      "title": "Green",
+      "use": "A green cast.",
+      "phrases": ["绿色调", "绿调", "森林调"],
+      "settings": { "temperature": -6, "tint": -16, "vibrance": 8 }
+    },
+    {
+      "id": "cream",
+      "title": "Cream",
+      "use": "Soft warm highlights, gentle contrast.",
+      "phrases": ["奶油色调", "奶油调", "奶油肌"],
+      "settings": { "temperature": 14, "clarity": -12, "contrast": -8, "shadows": 12, "vibrance": -6 }
+    },
+    {
+      "id": "recover_highlights",
+      "title": "Recover Highlights",
+      "use": "Highlights are blown. Pull them down.",
+      "phrases": ["高光过曝", "压高光", "高光太亮", "找回高光"],
+      "settings": { "highlights": -35, "whites": -15 }
+    },
+    {
+      "id": "lift_shadows",
+      "title": "Lift Shadows",
+      "use": "Shadows are blocked. Open them without lifting the whole frame.",
+      "phrases": ["阴影太黑", "提阴影", "暗部细节", "死黑"],
+      "settings": { "shadows": 35, "blacks": 12 }
+    },
+    {
+      "id": "crush_blacks",
+      "title": "Deeper Blacks",
+      "use": "Push the darkest tones down.",
+      "phrases": ["压黑", "黑色更深", "黑位"],
+      "settings": { "blacks": -35, "shadows": -8 }
+    },
+    {
+      "id": "vignette",
+      "title": "Vignette",
+      "use": "Darken the edges only.",
+      "phrases": ["暗角", "加暗角"],
+      "settings": { "vignette": -35 }
+    },
+    {
+      "id": "grain",
+      "title": "Grain",
+      "use": "Add grain. Not a full film grade.",
+      "phrases": ["胶片颗粒", "加点颗粒", "颗粒感", "颗粒"],
+      "settings": { "grain": 28 }
+    }
+  ]
+}

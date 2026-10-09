@@ -4,6 +4,8 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     /// The Layers panel's width, remembered across launches.
     @AppStorage("layersPanelWidth") private var layersPanelWidth = 252.0
+    /// The AI panel's width, remembered across launches.
+    @AppStorage("aiPanelWidth") private var aiPanelWidth = 320.0
     @Bindable var session: EditorSession
     var applicationDelegate: CompositorApplicationDelegate? = nil
     @Environment(\.openWindow) private var openWindow
@@ -113,6 +115,8 @@ struct ContentView: View {
                 if !session.canvasOnly {
                     PanelResizeEdge(width: $layersPanelWidth, range: LayersPanel.widths)
                     LayersPanel(session: session, width: layersPanelWidth)
+                    PanelResizeEdge(width: $aiPanelWidth, range: AIPanelView.widths)
+                    AIPanelView(session: session, width: aiPanelWidth, controller: applicationDelegate?.projects)
                 }
             }
             if !session.canvasOnly {
