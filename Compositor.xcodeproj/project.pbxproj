@@ -8,6 +8,12 @@
 
 /* Begin PBXBuildFile section */
 		5A9C0D1E2F3A4B5C6D7E8F01 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 5A9C0D1E2F3A4B5C6D7E8F03 /* Sparkle */; };
+		A1PANEL0000000000000011 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1PANEL0000000000000021 /* main.swift */; };
+		A1PANEL0000000000000012 /* AIPanelWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1PANEL0000000000000022 /* AIPanelWire.swift */; };
+		A1PANEL0000000000000013 /* AIConnectivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1PANEL0000000000000023 /* AIConnectivity.swift */; };
+		A1PANEL0000000000000014 /* AIProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1PANEL0000000000000024 /* AIProvider.swift */; };
+		A1PANEL0000000000000015 /* OpenAICompatibleProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1PANEL0000000000000025 /* OpenAICompatibleProvider.swift */; };
+		A1PANEL0000000000000016 /* AIPanelWorker in Executables */ = {isa = PBXBuildFile; fileRef = A1PANEL0000000000000001 /* AIPanelWorker */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -25,12 +31,25 @@
 			remoteGlobalIDString = 8F311F98304F03BB0017D14F;
 			remoteInfo = Compositor;
 		};
+		A1PANEL000000000000000B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8F311F91304F03BB0017D14F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A1PANEL0000000000000005;
+			remoteInfo = AIPanelWorker;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		8F311F99304F03BB0017D14F /* Compositor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Compositor.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8F311FA6304F03BC0017D14F /* CompositorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CompositorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8F311FB0304F03BC0017D14F /* CompositorUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CompositorUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1PANEL0000000000000001 /* AIPanelWorker */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = AIPanelWorker; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1PANEL0000000000000021 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		A1PANEL0000000000000022 /* AIPanelWire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIPanelWire.swift; sourceTree = "<group>"; };
+		A1PANEL0000000000000023 /* AIConnectivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIConnectivity.swift; sourceTree = "<group>"; };
+		A1PANEL0000000000000024 /* AIProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Providers/AIProvider.swift; sourceTree = "<group>"; };
+		A1PANEL0000000000000025 /* OpenAICompatibleProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Providers/OpenAICompatibleProvider.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -74,6 +93,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A1PANEL0000000000000003 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -83,6 +109,8 @@
 				8F311F9B304F03BB0017D14F /* Compositor */,
 				8F311FA9304F03BC0017D14F /* CompositorTests */,
 				8F311FB3304F03BC0017D14F /* CompositorUITests */,
+				A1PANEL0000000000000030 /* AIPanelWorker */,
+				A1PANEL0000000000000031 /* Worker Sources */,
 				8F311F9A304F03BB0017D14F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -93,8 +121,29 @@
 				8F311F99304F03BB0017D14F /* Compositor.app */,
 				8F311FA6304F03BC0017D14F /* CompositorTests.xctest */,
 				8F311FB0304F03BC0017D14F /* CompositorUITests.xctest */,
+				A1PANEL0000000000000001 /* AIPanelWorker */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A1PANEL0000000000000030 /* AIPanelWorker */ = {
+			isa = PBXGroup;
+			children = (
+				A1PANEL0000000000000021 /* main.swift */,
+			);
+			path = tools/AIPanelWorker;
+			sourceTree = "<group>";
+		};
+		A1PANEL0000000000000031 /* Worker Sources */ = {
+			isa = PBXGroup;
+			children = (
+				A1PANEL0000000000000022 /* AIPanelWire.swift */,
+				A1PANEL0000000000000023 /* AIConnectivity.swift */,
+				A1PANEL0000000000000024 /* AIProvider.swift */,
+				A1PANEL0000000000000025 /* OpenAICompatibleProvider.swift */,
+			);
+			name = "Worker Sources";
+			path = Compositor/AI;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -107,10 +156,12 @@
 				8F311F95304F03BB0017D14F /* Sources */,
 				8F311F96304F03BB0017D14F /* Frameworks */,
 				8F311F97304F03BB0017D14F /* Resources */,
+				A1PANEL0000000000000009 /* Copy Files */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				A1PANEL000000000000000C /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				8F311F9B304F03BB0017D14F /* Compositor */,
@@ -169,6 +220,22 @@
 			productReference = 8F311FB0304F03BC0017D14F /* CompositorUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		A1PANEL0000000000000005 /* AIPanelWorker */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1PANEL0000000000000006 /* Build configuration list for PBXNativeTarget "AIPanelWorker" */;
+			buildPhases = (
+				A1PANEL0000000000000004 /* Sources */,
+				A1PANEL0000000000000003 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = AIPanelWorker;
+			productName = AIPanelWorker;
+			productReference = A1PANEL0000000000000001 /* AIPanelWorker */;
+			productType = "com.apple.product-type.tool";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -189,6 +256,9 @@
 					8F311FAF304F03BC0017D14F = {
 						CreatedOnToolsVersion = 26.6;
 						TestTargetID = 8F311F98304F03BB0017D14F;
+					};
+					A1PANEL0000000000000005 = {
+						CreatedOnToolsVersion = 26.6;
 					};
 				};
 			};
@@ -213,6 +283,7 @@
 				8F311F98304F03BB0017D14F /* Compositor */,
 				8F311FA5304F03BC0017D14F /* CompositorTests */,
 				8F311FAF304F03BC0017D14F /* CompositorUITests */,
+				A1PANEL0000000000000005 /* AIPanelWorker */,
 			);
 		};
 /* End PBXProject section */
@@ -241,6 +312,20 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		A1PANEL0000000000000009 /* Copy Files */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 6;
+			files = (
+				A1PANEL0000000000000016 /* AIPanelWorker in Executables */,
+			);
+			name = "Copy Files";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		8F311F95304F03BB0017D14F /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -263,6 +348,18 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A1PANEL0000000000000004 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1PANEL0000000000000011 /* main.swift in Sources */,
+				A1PANEL0000000000000012 /* AIPanelWire.swift in Sources */,
+				A1PANEL0000000000000013 /* AIConnectivity.swift in Sources */,
+				A1PANEL0000000000000014 /* AIProvider.swift in Sources */,
+				A1PANEL0000000000000015 /* OpenAICompatibleProvider.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -275,6 +372,11 @@
 			isa = PBXTargetDependency;
 			target = 8F311F98304F03BB0017D14F /* Compositor */;
 			targetProxy = 8F311FB1304F03BC0017D14F /* PBXContainerItemProxy */;
+		};
+		A1PANEL000000000000000C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A1PANEL0000000000000005 /* AIPanelWorker */;
+			targetProxy = A1PANEL000000000000000B /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -568,6 +670,40 @@
 			};
 			name = Release;
 		};
+		A1PANEL0000000000000007 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Config/AIPanelWorker.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_APP_SANDBOX = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				OTHER_SWIFT_FLAGS = "-parse-as-library";
+				PRODUCT_BUNDLE_IDENTIFIER = com.wonderassembly.compositor.AIPanelWorker;
+				PRODUCT_NAME = AIPanelWorker;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		A1PANEL0000000000000008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Config/AIPanelWorker.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_APP_SANDBOX = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				OTHER_SWIFT_FLAGS = "-parse-as-library";
+				PRODUCT_BUNDLE_IDENTIFIER = com.wonderassembly.compositor.AIPanelWorker;
+				PRODUCT_NAME = AIPanelWorker;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -603,6 +739,15 @@
 			buildConfigurations = (
 				8F311FC1304F03BC0017D14F /* Debug */,
 				8F311FC2304F03BC0017D14F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A1PANEL0000000000000006 /* Build configuration list for PBXNativeTarget "AIPanelWorker" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1PANEL0000000000000007 /* Debug */,
+				A1PANEL0000000000000008 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
