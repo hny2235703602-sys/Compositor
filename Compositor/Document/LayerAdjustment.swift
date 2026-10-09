@@ -206,6 +206,39 @@ extension EditorSession {
         if kind.isEditable { adjustmentEditingID = layer.id }
     }
 
+    /// The same layer a person gets after adding an adjustment and confirming it: settings stored, editor closed.
+    @discardableResult
+    func insertAdjustment(_ kind: AdjustmentKind, configure: (inout LayerAdjustment) -> Void) -> Bool {
+        guard canEditLayers, let document, document.layers.count < 10_000 else { return false }
+        var layer = ImageLayer(name: uiName(kind.rawValue), blankSize: document.size)
+        var adjustment = LayerAdjustment(kind: kind)
+        configure(&adjustment)
+        guard adjustment.isValid else { return false }
+        layer.adjustment = adjustment
+        layer.parentID = activeLayer?.isGroup == true ? activeLayerID : activeLayer?.parentID
+        let index = document.layers.firstIndex { $0.id == activeLayerID }.map { $0 + 1 } ?? document.layers.count
+        beginEdit("New \(kind.rawValue) Adjustment")
+        self.document?.layers.insert(layer, at: index)
+        if let parent = layer.parentID { collapsedGroupIDs.remove(parent) }
+        activeLayerID = layer.id
+        endEdit()
+        return true
+    }
+
+    /// Reopens the newest adjustment of this kind and keeps the new settings, as Edit does on OK.
+    @discardableResult
+    func reviseAdjustment(_ kind: AdjustmentKind, configure: (inout LayerAdjustment) -> Void) -> Bool {
+        guard canEditLayers, let document,
+              let index = document.layers.lastIndex(where: { $0.adjustment?.kind == kind }),
+              var adjustment = document.layers[index].adjustment else { return false }
+        configure(&adjustment)
+        guard adjustment.isValid else { return false }
+        beginEdit("Edit \(kind.rawValue) Adjustment")
+        self.document?.layers[index].adjustment = adjustment
+        activeLayerID = document.layers[index].id
+        endEdit()
+        return true
+    }
     func updateAdjustment(_ id: UUID, value: LayerAdjustment) {
         guard let index = document?.layers.firstIndex(where: { $0.id == id }), value.isValid else { return }
         document?.layers[index].adjustment = value
