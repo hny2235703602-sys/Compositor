@@ -23,11 +23,13 @@ struct AIToolOutcome: Equatable {
 /// The rest are the same kind of entry, or a ProjectStore read/write. Nothing here runs shell or arbitrary code.
 enum AIToolRegistry {
     static let opacityTool = "set_layer_opacity"
+    static let blendTool = "set_layer_blend_mode"
     static let curvesTool = "use_curves"
     static let balanceTool = "use_color_balance"
     static let hueTool = "use_hue_saturation"
     static let exposureTool = "use_exposure"
     static let levelsTool = "use_levels"
+    static let gradientMapTool = "use_gradient_map"
     static let cameraRawTool = "use_camera_raw"
     static let previewTool = "render_preview"
     static let loadTool = "load_project"
@@ -36,6 +38,13 @@ enum AIToolRegistry {
     private static let opacityParameters = """
     {"type":"object","properties":{"percent":{"type":"number","description":"0 to 100. 60 means 60 percent, not 0.6."}},"required":["percent"]}
     """
+    /// Names are `LayerBlendMode.rawValue`. The list is the enum, so a new mode shows up here on its own.
+    private static let blendParameters: String = {
+        let names = LayerBlendMode.allCases.map { "\"\($0.rawValue)\"" }.joined(separator: ",")
+        return """
+        {"type":"object","properties":{"blendMode":{"type":"string","enum":[\(names)]},"opacity":{"type":"number","description":"Optional. 0 to 100, so 60 means 60 percent. Omit to leave the opacity unchanged."}},"required":["blendMode"]}
+        """
+    }()
     private static let curvesParameters = """
     {"type":"object","properties":{"points":{"type":"array","description":"RGB curve points, each with x and y from 0 to 255. The first x is 0, the last x is 255, and x increases. Opening Curves shows this curve."},"revise":{"type":"boolean","description":"True updates the Curves adjustment already added instead of adding another."}},"required":["points"]}
     """
@@ -50,6 +59,9 @@ enum AIToolRegistry {
     """
     private static let levelsParameters = """
     {"type":"object","properties":{"black":{"type":"number"},"white":{"type":"number"},"gamma":{"type":"number"},"outputBlack":{"type":"number"},"outputWhite":{"type":"number"},"revise":{"type":"boolean"}},"required":[]}
+    """
+    private static let gradientMapParameters = """
+    {"type":"object","properties":{"shadows":{"type":"object","description":"Color for the darkest tones. red, green, and blue are 0 to 255 or 0 to 1. Omit for black.","properties":{"red":{"type":"number"},"green":{"type":"number"},"blue":{"type":"number"}}},"highlights":{"type":"object","description":"Color for the lightest tones. red, green, and blue are 0 to 255 or 0 to 1. Omit for white.","properties":{"red":{"type":"number"},"green":{"type":"number"},"blue":{"type":"number"}}},"reversed":{"type":"boolean","description":"Swap the two ends."},"revise":{"type":"boolean"}},"required":[]}
     """
     /// The Camera Raw fields the look catalog actually sets. The rest of Camera Raw stays closed.
     private static let cameraRawParameters = """
@@ -68,6 +80,10 @@ enum AIToolRegistry {
         specs.append(AIToolSpec(name: opacityTool,
             description: "Set the active layer's opacity. percent is 0 to 100, so 60 means 60%. One undo step." + opacity,
             parameters: opacityParameters))
+        let blend = session.canEditAppearance ? "" : " Unavailable right now."
+        specs.append(AIToolSpec(name: blendTool,
+            description: "Set the active layer's blend mode. blendMode is one of the layer blend mode names. Screen is 滤色, Soft Light is 柔光, Luminosity is 明度. Optional opacity is 0 to 100. One undo step." + blend,
+            parameters: blendParameters))
         let grade = session.canEditLayers ? "" : " Unavailable right now."
         let trail = " Adds an adjustment layer and leaves the original pixels. Opening that adjustment shows these settings. Pass revise true to change the one already added." + grade
         specs.append(AIToolSpec(name: curvesTool,
@@ -85,6 +101,9 @@ enum AIToolRegistry {
         specs.append(AIToolSpec(name: levelsTool,
             description: "Add a Levels adjustment on RGB. black and white are 0 to 255. gamma is 0.1 to 9.99." + trail,
             parameters: levelsParameters))
+        specs.append(AIToolSpec(name: gradientMapTool,
+            description: "Add a Gradient Map adjustment. Omit the colors for black shadows and white highlights. shadows and highlights each have red, green, and blue from 0 to 255 or 0 to 1. reversed swaps the ends. For 明度, call set_layer_blend_mode with Luminosity on this new layer afterwards." + trail,
+            parameters: gradientMapParameters))
         specs.append(AIToolSpec(name: cameraRawTool,
             description: "Apply Camera Raw to the active layer's pixels. One undo. Pass only the sliders this picture needs: exposure (-5 to 5), contrast, highlights, shadows, whites, blacks, temperature, tint, vibrance, saturation, texture, clarity, dehaze, vignette (-100 to 100), and grain (0 to 100). A look from the catalog is one call with that look's numbers. Do not use this for a plain brightness change." + grade,
             parameters: cameraRawParameters))
@@ -104,11 +123,13 @@ enum AIToolRegistry {
     static func perform(_ call: AIToolCall, on session: EditorSession, controller: ProjectController? = nil) async -> AIToolOutcome {
         switch call.name {
         case opacityTool: return setOpacity(call, on: session)
+        case blendTool: return setBlendMode(call, on: session)
         case curvesTool: return useCurves(call, on: session)
         case balanceTool: return useColorBalance(call, on: session)
         case hueTool: return useHueSaturation(call, on: session)
         case exposureTool: return useExposure(call, on: session)
         case levelsTool: return useLevels(call, on: session)
+        case gradientMapTool: return useGradientMap(call, on: session)
         case cameraRawTool: return await useCameraRaw(call, on: session)
         case previewTool: return AIToolOutcome(text: "Rendered the current document.", changedDocument: false, wantsPreview: true)
         case loadTool: return await loadProject(call, on: session, controller: controller)
@@ -168,6 +189,36 @@ enum AIToolRegistry {
         let outcome = run(entry, on: session)
         guard outcome.changedDocument else { return outcome }
         return .changed("Ran Layer Opacity. Opacity is now \(Int((value * 100).rounded()))%.")
+    }
+
+    /// The active layer only. `blendMode` must be a `LayerBlendMode` raw value. Opacity, when present, shares that undo step.
+    private static func setBlendMode(_ call: AIToolCall, on session: EditorSession) -> AIToolOutcome {
+        guard let name = stringArgument(named: "blendMode", in: call.arguments),
+              let mode = blendMode(named: name) else {
+            return .unchanged("set_layer_blend_mode needs a blend mode name. The document was not changed.")
+        }
+        let opacity = argument(named: "opacity", in: call.arguments)
+        if let opacity, opacityValue(from: opacity) == nil {
+            return .unchanged("set_layer_blend_mode opacity is 0 to 100. The document was not changed.")
+        }
+        let value = opacity.flatMap { opacityValue(from: $0) }
+        let entry = CommandPaletteEntry(id: "Layer Blend Mode", shortcut: nil, isEnabled: session.canEditAppearance,
+            perform: {
+                session.setLayerBlendMode(mode)
+                if let value { session.setLayerOpacity(value) }
+            })
+        let outcome = run(entry, on: session)
+        guard outcome.changedDocument else { return outcome }
+        var text = "Ran Layer Blend Mode. Blend mode is now \(mode.rawValue)."
+        if let value { text += " Opacity is now \(Int((value * 100).rounded()))%." }
+        return .changed(text)
+    }
+
+    /// A raw value such as "Soft Light" or "Linear Dodge (Add)". Letter case is ignored. Other spellings are refused.
+    static func blendMode(named raw: String) -> LayerBlendMode? {
+        let folded = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !folded.isEmpty else { return nil }
+        return LayerBlendMode.allCases.first { $0.rawValue.lowercased() == folded }
     }
 
     private static func useCurves(_ call: AIToolCall, on session: EditorSession) -> AIToolOutcome {
@@ -259,6 +310,37 @@ enum AIToolRegistry {
         var settings = LevelsSettings()
         settings.ranges[0] = range
         return place(.levels, revise: flag("revise", in: call.arguments), on: session) { $0.levels = settings }
+    }
+
+    /// Black shadows and white highlights when the colors are omitted. That is the full 0–255 ramp.
+    private static func useGradientMap(_ call: AIToolCall, on session: EditorSession) -> AIToolOutcome {
+        var settings = GradientMapSettings()
+        if let shadows = adjustmentColor(named: "shadows", in: call.arguments) {
+            guard let shadows else { return .unchanged("use_gradient_map shadows need red, green, and blue from 0 to 255. The document was not changed.") }
+            settings.shadows = shadows
+        }
+        if let highlights = adjustmentColor(named: "highlights", in: call.arguments) {
+            guard let highlights else { return .unchanged("use_gradient_map highlights need red, green, and blue from 0 to 255. The document was not changed.") }
+            settings.highlights = highlights
+        }
+        settings.reversed = flag("reversed", in: call.arguments)
+        settings = settings.normalized
+        guard settings.isValid else {
+            return .unchanged("use_gradient_map needs colors from 0 to 255. The document was not changed.")
+        }
+        return place(.gradientMap, revise: flag("revise", in: call.arguments), on: session) { $0.gradientMap = settings }
+    }
+
+    /// Nil when the key is absent. `.some(nil)` when the key is present but not a color.
+    private static func adjustmentColor(named key: String, in arguments: String) -> AdjustmentColor?? {
+        guard let data = arguments.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              json[key] != nil else { return nil }
+        guard let item = json[key] as? [String: Any],
+              let red = number(item["red"]), let green = number(item["green"]), let blue = number(item["blue"]) else { return .some(nil) }
+        let scale: Double = max(red, green, blue) <= 1.5 ? 1 : 255
+        let color = AdjustmentColor(red: red / scale, green: green / scale, blue: blue / scale)
+        return color.isValid ? .some(color) : .some(nil)
     }
 
     /// Bakes Camera Raw into the active layer. `commitFilter` records the one undo step.
@@ -482,9 +564,13 @@ enum AIToolRegistry {
     }
 
     private static func pathArgument(in arguments: String) -> String? {
+        stringArgument(named: "path", in: arguments)
+    }
+
+    private static func stringArgument(named key: String, in arguments: String) -> String? {
         guard let data = arguments.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
-        return json["path"] as? String
+        return json[key] as? String
     }
 
 }

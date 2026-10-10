@@ -52,6 +52,8 @@ struct AIContextTests {
         #expect(context.layers.map(\.depth) == [0, 1])
         #expect(context.layers.map(\.kind) == ["group", "pixels"])
         #expect(context.layers.map(\.visible) == [true, true])
+        #expect(context.layers.map(\.opacity) == [1, 0.6])
+        #expect(context.layers.map(\.blendMode) == ["Normal", "Multiply"])
 
         let selection = try #require(context.selection)
         let bounds = try #require(selection.bounds)

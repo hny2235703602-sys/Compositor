@@ -4,7 +4,7 @@
       "id": "clear",
       "title": "Clear",
       "use": "Gray, hazy, or muddy. Not a saturation boost and not opacity.",
-      "phrases": ["通透", "不通透", "发灰", "发闷", "灰蒙", "灰蒙蒙", "去雾", "去薄雾", "去朦胧"],
+      "phrases": ["通透", "不通透", "发灰", "灰蒙", "灰蒙蒙", "去雾", "去薄雾", "去朦胧"],
       "settings": { "dehaze": 18, "clarity": 12, "contrast": 12, "shadows": 18, "blacks": -10, "vibrance": 10 }
     },
     {

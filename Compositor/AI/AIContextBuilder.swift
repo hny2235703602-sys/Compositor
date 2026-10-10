@@ -49,6 +49,8 @@ struct AIContext: Equatable {
     struct LayerNode: Equatable {
         var id: String
         var name: String
+        var opacity: Double
+        var blendMode: String
         var depth: Int
         var visible: Bool
         var kind: String
@@ -168,7 +170,8 @@ enum AIContextBuilder {
     private static func layerTree(_ document: CanvasDocument) -> [AIContext.LayerNode] {
         let parents = Dictionary(uniqueKeysWithValues: document.layers.map { ($0.id, $0.parentID) })
         return document.layers.map { layer in
-            AIContext.LayerNode(id: layer.id.uuidString, name: layer.name, depth: depth(of: layer.id, parents: parents),
+            AIContext.LayerNode(id: layer.id.uuidString, name: layer.name, opacity: layer.opacity,
+                blendMode: layer.blendMode.rawValue, depth: depth(of: layer.id, parents: parents),
                 visible: layer.isVisible, kind: kind(of: layer))
         }
     }
@@ -230,7 +233,7 @@ extension AIContext {
         struct Selection: Encodable { var bounds: Bounds?; var hasMask: Bool; var previewPNG: String? }
         struct Bounds: Encodable { var x, y, width, height: Double }
         struct Layer: Encodable { var id, name, blendMode: String; var opacity: Double }
-        struct LayerNode: Encodable { var id, name, kind: String; var depth: Int; var visible: Bool }
+        struct LayerNode: Encodable { var id, name, blendMode, kind: String; var opacity: Double; var depth: Int; var visible: Bool }
 
         init(_ context: AIContext) {
             document = context.document.map { Document(width: $0.width, height: $0.height, path: $0.path, isModified: $0.isModified) }
@@ -240,7 +243,7 @@ extension AIContext {
             selection = context.selection.map { Selection(bounds: $0.bounds.map { Bounds(x: $0.x, y: $0.y, width: $0.width, height: $0.height) }, hasMask: $0.hasMask, previewPNG: $0.previewPNG) }
             activeLayer = context.activeLayer.map { Layer(id: $0.id, name: $0.name, blendMode: $0.blendMode, opacity: $0.opacity) }
             selectedLayerIDs = context.selectedLayerIDs
-            layers = context.layers.map { LayerNode(id: $0.id, name: $0.name, kind: $0.kind, depth: $0.depth, visible: $0.visible) }
+            layers = context.layers.map { LayerNode(id: $0.id, name: $0.name, blendMode: $0.blendMode, kind: $0.kind, opacity: $0.opacity, depth: $0.depth, visible: $0.visible) }
             compositePNG = context.compositePNG
             compositeError = context.compositeError
         }

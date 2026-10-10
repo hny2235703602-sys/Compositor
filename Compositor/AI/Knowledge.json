@@ -1,0 +1,54 @@
+{
+  "notes": [
+    {
+      "id": "low_key_dull",
+      "phrases": ["发闷", "很闷", "沉闷"],
+      "text": "A dark frame that still feels blocked. Check the brightest tone. It should reach about 230, not 255. If it is short of that, call use_levels and set white below 255, only far enough that the brightest tone reaches about 230. Keep the frame low-key. Do not raise vibrance or saturation. Do not add negative exposure. Setting white too low clips highlights to pure white. If a catalog recipe is also attached, follow this diagnosis instead of those sliders."
+    },
+    {
+      "id": "high_key_harsh",
+      "phrases": ["刺眼", "高调刺眼", "亮得刺眼"],
+      "text": "A light frame whose darkest tone is still above about 20 looks harsh. Call use_levels and raise black only until the darkest tone is about 20 or lower. A little highlight clip is acceptable. A large area of pure white is not. Nudge gamma if the frame looks harsh after the black point moves. Do not lift exposure to chase this. If a catalog recipe is also attached, follow this diagnosis instead of those sliders."
+    },
+    {
+      "id": "short_range",
+      "phrases": ["两端没像素", "没有黑白", "黑白不够"],
+      "text": "The darkest tones sit well above 0 and the brightest sit well below 255, with most pixels in the middle. Call use_levels. Move black up to where pixels begin, and white down to where pixels begin. Do not set outputBlack near 50 or outputWhite near 200. Dragging past the pixel pile clips to pure black or pure white."
+    },
+    {
+      "id": "weak_separation",
+      "phrases": ["层次平", "不够立体", "分离不够"],
+      "text": "Pixels already reach both ends, but light and dark are not separated. Do not clip the endpoints. Call use_curves with an S shape: pull a shadow point down and a highlight point up. Keep the first point at 0,0 and the last at 255,255. A steep segment looks unnatural. Higher contrast also raises apparent color. If color gets loud, lower vibrance. Do not raise saturation."
+    },
+    {
+      "id": "excess_contrast",
+      "phrases": ["反差太大", "反差过强", "中间没层次"],
+      "text": "Pixels pile up at both ends and the middle is thin. This is too much contrast, not a request for more. Call use_camera_raw with shadows raised and highlights lowered. Do not raise vibrance in that same call. If color gets loud afterwards, lower vibrance. Opening blocked shadows too far turns them into flat gray."
+    },
+    {
+      "id": "distant_haze",
+      "phrases": ["灰雾", "雾霾", "远景发灰"],
+      "text": "The tonal range already reaches both ends, and the distance still looks hazy. Call use_gradient_map with black shadows and white highlights, then set_layer_blend_mode to Luminosity on that new layer. Normal blend mode turns the frame black and white. Do not raise saturation for this. If a catalog dehaze recipe is also attached, follow this diagnosis instead."
+    },
+    {
+      "id": "gray_tone",
+      "phrases": ["要灰调", "做成灰调", "灰调效果"],
+      "text": "A quiet scene, such as fog, rain, overcast, or water, whose pixels sit in the middle should stay there. Call use_curves with an inverse S: highlights down, shadows up, and keep the ends off 0 and 255. Also lower saturation. Do not raise contrast or dehaze. If a catalog recipe is also attached, follow this diagnosis instead of those sliders."
+    },
+    {
+      "id": "pale_color",
+      "phrases": ["颜色发淡", "色彩太淡", "颜色太淡"],
+      "text": "The frame is not a color cast. It is pale. Call use_camera_raw with vibrance raised. Do not push saturation hard. Already-rich colors turn into flat blobs if saturation goes to the top. When the request also asks for contrast, adjust tone first."
+    },
+    {
+      "id": "loud_color",
+      "phrases": ["颜色太艳", "饱和太高", "颜色发脏"],
+      "text": "Color got loud, often after a contrast change. Lower vibrance with use_camera_raw. Do not raise saturation. Do this after the tone step, not before."
+    },
+    {
+      "id": "one_color",
+      "phrases": ["只改一种颜色", "这个颜色太跳"],
+      "text": "Only one color range should change. Call use_hue_saturation bands. Keys are Reds, Yellows, Greens, Cyans, Blues, Magentas. Saturation on that range may go to -100. A hue near 30 degrees needs both Reds and Yellows. The ranges cannot be widened."
+    }
+  ]
+}

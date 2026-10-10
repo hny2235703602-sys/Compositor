@@ -31,7 +31,7 @@ struct AIToolTests {
         let steps = session.history.undoCount
         let names = AIToolRegistry.specs(for: session).map(\.name)
         let commands = CommandPaletteEntry.layerCommands(for: session) + CommandPaletteEntry.tools(for: session)
-        let added = ["set_layer_opacity", "use_curves", "use_color_balance", "use_hue_saturation", "use_exposure", "use_levels", "use_camera_raw", "render_preview", "load_project", "save_project"]
+        let added = ["set_layer_opacity", "set_layer_blend_mode", "use_curves", "use_color_balance", "use_hue_saturation", "use_exposure", "use_levels", "use_gradient_map", "use_camera_raw", "render_preview", "load_project", "save_project"]
         #expect(names.contains("tool_brush"))
         #expect(names.contains("layer_add_layer_mask"))
         #expect(added.allSatisfy(names.contains))
@@ -109,6 +109,67 @@ struct AIToolTests {
         #expect(AIToolRegistry.functionName("Tool › Move / Transform") == "tool_move_transform")
     }
 
+    @Test func blendModeUsesTheLayerNamesAndIsOneUndo() async throws {
+        #expect(LayerBlendMode.allCases.count == 24)
+        #expect(LayerBlendMode.allCases.allSatisfy { AIToolRegistry.blendMode(named: $0.rawValue) == $0 })
+        #expect(AIToolRegistry.blendMode(named: "soft light") == .softLight)
+        #expect(AIToolRegistry.blendMode(named: "Linear Dodge (Add)") == .linearDodge)
+        #expect(AIToolRegistry.blendMode(named: "softLight") == nil)
+        #expect(AIToolRegistry.blendMode(named: "滤色") == nil)
+
+        let session = try makeSession()
+        let steps = session.history.undoCount
+        let reply = await AIToolRegistry.perform(AIToolCall(id: "1", name: "set_layer_blend_mode", arguments: #"{"blendMode":"Screen","opacity":40}"#), on: session)
+        #expect(reply.changedDocument)
+        #expect(reply.text.contains("Screen"))
+        #expect(reply.text.contains("40%"))
+        #expect(session.activeLayer?.blendMode == .screen)
+        #expect(session.activeLayer?.opacity == 0.4)
+        #expect(session.history.undoCount == steps + 1)
+        #expect(session.history.undoName == "Layer Blend Mode")
+        session.undo()
+        #expect(session.activeLayer?.blendMode == .normal)
+        #expect(session.activeLayer?.opacity == 1)
+        #expect(session.history.undoCount == steps)
+
+        let refused = await AIToolRegistry.perform(AIToolCall(id: "2", name: "set_layer_blend_mode", arguments: #"{"blendMode":"Glow"}"#), on: session)
+        #expect(!refused.changedDocument)
+        #expect(session.activeLayer?.blendMode == .normal)
+        #expect(session.history.undoCount == steps)
+    }
+
+    @Test func gradientMapThenLuminosityAreTwoUndos() async throws {
+        let session = try makeSession()
+        let steps = session.history.undoCount
+        let added = await AIToolRegistry.perform(AIToolCall(id: "1", name: "use_gradient_map", arguments: "{}"), on: session)
+        #expect(added.changedDocument)
+        let map = try #require(session.activeLayer?.adjustment)
+        #expect(map.kind == .gradientMap)
+        #expect(map.gradientMap.shadows == AdjustmentColor(red: 0, green: 0, blue: 0))
+        #expect(map.gradientMap.highlights == AdjustmentColor(red: 1, green: 1, blue: 1))
+        #expect(!map.gradientMap.reversed)
+        #expect(session.history.undoCount == steps + 1)
+        #expect(session.history.undoName == "New Gradient Map Adjustment")
+
+        let blend = await AIToolRegistry.perform(AIToolCall(id: "2", name: "set_layer_blend_mode", arguments: #"{"blendMode":"Luminosity"}"#), on: session)
+        #expect(blend.changedDocument)
+        #expect(session.activeLayer?.blendMode == .luminosity)
+        #expect(session.history.undoCount == steps + 2)
+        session.undo()
+        #expect(session.activeLayer?.adjustment?.kind == .gradientMap)
+        #expect(session.activeLayer?.blendMode == .normal)
+        session.undo()
+        #expect(session.document?.layers.contains { $0.adjustment != nil } == false)
+        #expect(session.history.undoCount == steps)
+
+        let colored = await AIToolRegistry.perform(AIToolCall(id: "3", name: "use_gradient_map", arguments: #"{"shadows":{"red":0,"green":0,"blue":255},"highlights":{"red":1,"green":1,"blue":1},"reversed":true}"#), on: session)
+        #expect(colored.changedDocument)
+        #expect(session.activeLayer?.adjustment?.gradientMap.shadows == AdjustmentColor(red: 0, green: 0, blue: 1))
+        #expect(session.activeLayer?.adjustment?.gradientMap.reversed == true)
+        let bad = await AIToolRegistry.perform(AIToolCall(id: "4", name: "use_gradient_map", arguments: #"{"highlights":{"red":300}}"#), on: session)
+        #expect(!bad.changedDocument)
+    }
+
     @Test func coolerGradeIsOneUndoAndThePreviewFits() async throws {
         let session = try graySession()
         let before = try sample(session)
@@ -140,6 +201,15 @@ struct AIToolTests {
         #expect(AILookNotes.look(named: "黑金色调")?.undoName == "Black and Gold")
         #expect(AILookNotes.look(named: "暗色调")?.undoName == "Dark Tone")
         #expect(AILookNotes.look(named: "sharper") == nil)
+        #expect(AILookNotes.directMatch(in: "照片发闷") == nil)
+        #expect(!AILookNotes.index.contains("发闷"))
+        let dull = AIKnowledge.note(for: "照片发闷")
+        #expect(dull.contains("230"))
+        #expect(dull.contains("use_levels"))
+        #expect(dull.contains("Do not raise vibrance"))
+        #expect(AIKnowledge.note(for: "什么是发闷？") == "")
+        #expect(AIKnowledge.matches(in: "这张高调刺眼").first?.phrase == "高调刺眼")
+        #expect(AIKnowledge.matches(in: "远景发灰").map(\.id) == ["distant_haze"])
 
         let session = try graySession()
         let before = try sample(session)
@@ -275,6 +345,52 @@ struct AIToolTests {
         #expect(refused.detail.contains("unaffected"))
     }
 
+    @Test func theOtherDiagnosesNameTheToolTheyMean() {
+        let expected: [(String, String, String)] = [
+            ("两端没像素", "short_range", "use_levels"),
+            ("层次平", "weak_separation", "use_curves"),
+            ("反差太大", "excess_contrast", "use_camera_raw"),
+            ("做成灰调", "gray_tone", "inverse S"),
+            ("颜色发淡", "pale_color", "vibrance raised"),
+            ("颜色太艳", "loud_color", "Lower vibrance"),
+            ("只改一种颜色", "one_color", "use_hue_saturation"),
+        ]
+        for (phrase, id, instruction) in expected {
+            let note = AIKnowledge.note(for: phrase)
+            #expect(AIKnowledge.matches(in: phrase).map(\.id) == [id])
+            #expect(note.contains("Diagnosis for 「\(phrase)」"))
+            #expect(note.contains(instruction))
+        }
+        #expect(AIKnowledge.note(for: "两端没像素").contains("outputWhite near 200"))
+        #expect(AIKnowledge.note(for: "层次平").contains("255,255"))
+        #expect(AIKnowledge.note(for: "反差太大").contains("Do not raise vibrance"))
+        #expect(AIKnowledge.note(for: "做成灰调").contains("lower saturation"))
+        #expect(AIKnowledge.note(for: "颜色发淡").contains("Do not push saturation"))
+        #expect(AIKnowledge.note(for: "颜色太艳").contains("Do not raise saturation"))
+        #expect(AIKnowledge.note(for: "只改一种颜色").contains("30 degrees"))
+        let mixed = AIKnowledge.note(for: "照片发闷而且颜色发淡")
+        #expect(mixed.contains("low_key_dull"))
+        #expect(mixed.contains("pale_color"))
+        #expect(mixed.contains("low_key_dull outranks the other diagnoses, and any catalog recipe yields"))
+        #expect(!AIKnowledge.note(for: "照片发闷").contains("outranks"))
+    }
+
+    @Test func dullLevelsLiftsTheBrightestToneToAbout230() async throws {
+        let session = try toneSession(level: 200)
+        let before = try await brightest(session)
+        #expect(before == 200)
+        let steps = session.history.undoCount
+        let provider = ScriptedDullLevels(white: 200.0 * 255.0 / 230.0)
+        let model = AIPanelModel()
+        await model.run(question: "照片发闷", session: session, provider: provider)
+        #expect(provider.sawDiagnosis)
+        #expect(model.error == nil)
+        #expect(session.history.undoCount == steps + 1)
+        #expect(session.history.undoName == "New Levels Adjustment")
+        let after = try await brightest(session)
+        #expect((225...235).contains(after))
+    }
+
     @Test func aDeadHelperDoesNotEscape() async {
         let launch = await AIPanelProcess.launch(executable: URL(fileURLWithPath: "/usr/bin/false"), request: Data(), timeout: 5)
         #expect(launch.output == nil)
@@ -286,6 +402,34 @@ struct AIToolTests {
         session.createDocument(width: 80, height: 40, emptyLayer: true)
         _ = try #require(session.activeLayer)
         return session
+    }
+
+    private func toneSession(level: UInt8) throws -> EditorSession {
+        let session = EditorSession()
+        session.createDocument(width: 8, height: 8)
+        let space = try #require(CGColorSpace(name: CGColorSpace.sRGB))
+        let context = try #require(CGContext(data: nil, width: 8, height: 8, bitsPerComponent: 8, bytesPerRow: 32,
+            space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        let unit = CGFloat(level) / 255
+        context.setFillColor(CGColor(srgbRed: unit, green: unit, blue: unit, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: 8, height: 8))
+        let image = try #require(context.makeImage())
+        session.insert(ImportedImage(image: image, thumbnail: image, name: "Gray"))
+        return session
+    }
+
+    private func brightest(_ session: EditorSession) async throws -> Int {
+        let image = try await ImageExporter.shared.render(try #require(session.projectSnapshot())).image
+        let space = try #require(CGColorSpace(name: CGColorSpace.sRGB))
+        let context = try #require(CGContext(data: nil, width: image.width, height: image.height, bitsPerComponent: 8,
+            bytesPerRow: image.width * 4, space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        let bytes = try #require(context.data).assumingMemoryBound(to: UInt8.self)
+        var peak = 0
+        for index in 0..<(image.width * image.height) {
+            peak = max(peak, Int(bytes[index * 4]), Int(bytes[index * 4 + 1]), Int(bytes[index * 4 + 2]))
+        }
+        return peak
     }
 
     private func graySession() throws -> EditorSession {
@@ -338,6 +482,25 @@ private final class FailingProvider: AIProvider, @unchecked Sendable {
     }
 }
 
+/// Reads the dull-frame diagnosis, then sets the Levels white point so a tone of 200 lands near 230.
+private final class ScriptedDullLevels: AIProvider, @unchecked Sendable {
+    var sawDiagnosis = false
+    private var calls = 0
+    private let white: Double
+    init(white: Double) { self.white = white }
+    func complete(_ turns: [AITurn], tools: [AIToolSpec]) async throws -> AICompletion {
+        if turns.contains(where: { $0.text.contains("Diagnosis for 「发闷」") }) { sawDiagnosis = true }
+        if tools.isEmpty {
+            return AICompletion(text: "理解：发闷。方案：用色阶把最亮收到大约 230。", toolCalls: [])
+        }
+        if calls == 0 {
+            calls = 1
+            return AICompletion(text: nil, toolCalls: [AIToolCall(id: "L", name: "use_levels", arguments: #"{"white":\#(white)}"#)])
+        }
+        return AICompletion(text: "审阅：最亮大约到 230。", toolCalls: [])
+    }
+}
+
 /// Looks at the picture and the catalog recipe, then grades with its own numbers.
 private final class ScriptedGrade: AIProvider, @unchecked Sendable {
     var sawImage = false
@@ -352,7 +515,7 @@ private final class ScriptedGrade: AIProvider, @unchecked Sendable {
     }
     func complete(_ turns: [AITurn], tools: [AIToolSpec]) async throws -> AICompletion {
         if turns.contains(where: { !$0.images.isEmpty }) { sawImage = true }
-        if turns.contains(where: { $0.text.contains("temperature -30") && $0.text.contains("Color Balance") }) { sawRecipe = true }
+        if turns.contains(where: { $0.text.contains("temperature -30") }) { sawRecipe = true }
         if turns.contains(where: { $0.text.contains("correcting that result") }) { sawCorrection = true }
         if tools.isEmpty {
             return AICompletion(text: "理解：要冷色调。方案：用色彩平衡把中间调推向青和蓝。", toolCalls: [])

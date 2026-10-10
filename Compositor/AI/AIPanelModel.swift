@@ -89,6 +89,7 @@ final class AIPanelModel {
             }
             let asked = question + "\n\n" + AIContextBuilder.summary(context) + "\n\n" + AIContextBuilder.promptJSON(context)
                 + Self.catalogNote(for: question, earlier: messages.dropLast().map(\.self))
+                + AIKnowledge.note(for: question)
             let preview = context.modelJPEG.map { [$0] } ?? []
             turns.append(AITurn(role: .user, text: asked, images: preview))
             if AILookNotes.isQuestion(question) {
@@ -141,18 +142,20 @@ final class AIPanelModel {
     activeTool is the current tool. toolMode, when present, is that tool's mode (Paint or Erase, Liquify, and so on).
     selection is null when nothing is selected. Otherwise bounds is {x, y, width, height} in document pixels, hasMask is true when the selection has coverage, and previewPNG is a base64 PNG of that region. previewPNG is omitted when the selection is empty.
     activeLayer is the primary selected layer. opacity runs from 0 to 1. selectedLayerIDs lists every selected layer, bottom to top.
-    layers lists every layer, bottom to top. depth is how deep the layer sits in a folder (0 is the root). kind is pixels, group, adjustment, shape, or text. visible is the layer's own flag.
+    layers lists every layer, bottom to top. depth is how deep the layer sits in a folder (0 is the root). kind is pixels, group, adjustment, shape, or text. visible is the layer's own flag. opacity runs from 0 to 1. blendMode is that layer's blend mode.
     compositePNG is a base64 PNG of the flattened canvas with its long side at or under 1024 pixels. It is omitted when the canvas could not be rendered; compositeError then says why.
 
     You may change the document only by calling the listed tools. There is no shell and no way to run Swift or any other code. If a tool result says the command is unknown or unavailable, the document was not changed; say so.
 
     set_layer_opacity sets the active layer's opacity. percent is 0 to 100: for 60% pass 60. That change is one undo (Edit > Undo).
+    set_layer_blend_mode sets the active layer's blend mode. blendMode is one of: \(LayerBlendMode.allCases.map(\.rawValue).joined(separator: ", ")). Screen is 滤色, Soft Light is 柔光, Luminosity is 明度. Optional opacity is 0 to 100. That change is one undo. A blend mode change is this tool, not an adjustment.
     A picture change is made the way a person uses the app. Do not replace pixel layers. Add an adjustment layer, then the user can open it and see the settings.
     use_curves adds Curves. points is the RGB curve, each point {x, y} from 0 to 255 or from 0 to 1. It must bend. If a straight line is refused, call use_curves again with a bent curve before moving on.
     use_color_balance adds Color Balance. Each slider is -100 to 100. Positive cyanRed is red, negative is cyan. Positive magentaGreen is green. Positive yellowBlue is blue. Name them shadowCyanRed, midCyanRed, highlightCyanRed, and the same for MagentaGreen and YellowBlue.
     use_hue_saturation adds Hue/Saturation. Top-level hue, saturation, and lightness edit Master only, from -180 to 180 and -100 to 100. bands sets each range on its own: Master, Reds, Yellows, Greens, Cyans, Blues, Magentas. There is no Oranges or Purples key. A hue near 30° weighs about half on Reds and half on Yellows, so a shift of orange sets both, and the two hue numbers can differ. Black and gold pulls Reds and Yellows toward gold and lowers saturation on Greens, Cyans, Blues, and Magentas. It is not one Master hue.
     use_exposure adds Exposure. exposure is stops from -20 to 20. offset is -0.5 to 0.5. gamma is 0.01 to 9.99.
     use_levels adds Levels on the RGB channel. black and white are 0 to 255. gamma is 0.1 to 9.99. outputBlack and outputWhite are 0 to 255.
+    use_gradient_map adds a Gradient Map adjustment. Omit the colors for black shadows and white highlights. shadows and highlights are each {red, green, blue} from 0 to 255 or 0 to 1. reversed swaps the ends. A request for a gradient map plus 明度 is this tool, then set_layer_blend_mode with Luminosity on the new layer. Those are two undos. It is not the clear Camera Raw recipe.
     use_camera_raw applies Camera Raw to the active layer. One call, one undo. The only sliders are exposure (-5 to 5), contrast, highlights, shadows, whites, blacks, temperature, tint, vibrance, saturation, texture, clarity, dehaze, vignette (-100 to 100), and grain (0 to 100). A catalog look is those numbers in one call. Do not call it for a plain "too bright" or "too dark" request; that is use_exposure.
     Pass revise true only when reviewing, to change the adjustment of that kind already in the document.
     When the first reply allows no tools, write two parts in the user's language: 理解, what they asked for, and 方案, which of these adjustments this picture needs and the settings. A catalog look that names clarity, texture, dehaze, vibrance, vignette, or grain is one use_camera_raw call with the recipe's numbers, including its exposure, contrast, highlights, shadows, whites, blacks, temperature, tint, and saturation. A request that is only too bright or too dark is use_exposure, not Camera Raw. Change any number the attached picture requires.
@@ -181,12 +184,12 @@ final class AIPanelModel {
 
         \(role)
         \(AILookNotes.recipe(of: look))
-        Read those numbers as the method. A look that needs clarity, texture, dehaze, vibrance, vignette, or grain is one use_camera_raw call with these numbers. A grading wheel is not a Camera Raw slider: express that hue with use_hue_saturation bands, not a Master hue. Black and gold sets Reds and Yellows toward gold and lowers saturation on the other ranges. A look whose use says it is only an exposure change is use_exposure, not Camera Raw. Follow the user's words when they differ from the recipe.
+        Read those numbers as the method. A look that needs clarity, texture, dehaze, vibrance, vignette, or grain is one use_camera_raw call with these numbers. A grading wheel is not a Camera Raw slider: express that hue with use_hue_saturation bands, not a Master hue. Black and gold sets Reds and Yellows toward gold and lowers saturation on the other ranges. A look whose use says it is only an exposure change is use_exposure, not Camera Raw. If the user asks for a gradient map, call use_gradient_map instead of this recipe, then set Luminosity when they ask for 明度. Follow the user's words when they differ from the recipe.
         """
     }
 
     private static let operate = """
-    Now make that change in the software. If the plan is a Camera Raw look, call use_camera_raw once with its sliders. Otherwise use use_curves, use_color_balance, use_hue_saturation, use_exposure, or use_levels, one adjustment at a time, and leave the original pixels in place. A request that is only too bright or too dark is use_exposure. Follow the plan, and change any number this picture requires. When the planned change exists, reply with no tool call.
+    Now make that change in the software. If the plan is a Camera Raw look, call use_camera_raw once with its sliders. Otherwise use use_curves, use_color_balance, use_hue_saturation, use_exposure, use_levels, or use_gradient_map, one adjustment at a time, and leave the original pixels in place. A request that is only too bright or too dark is use_exposure. A request for a gradient map calls use_gradient_map. Black to white is the default. 明度 on that new layer is a following set_layer_blend_mode with Luminosity. A request to change the blend mode calls set_layer_blend_mode. Screen is 滤色, Soft Light is 柔光, Luminosity is 明度. Follow the plan, and change any number this picture requires. When the planned change exists, reply with no tool call.
     """
 
     private static let review = """
@@ -252,7 +255,9 @@ final class AIPanelModel {
         case AIToolRegistry.hueTool: String(localized: "Hue/Saturation")
         case AIToolRegistry.exposureTool: String(localized: "Exposure")
         case AIToolRegistry.levelsTool: String(localized: "Levels")
+        case AIToolRegistry.gradientMapTool: String(localized: "Gradient Map")
         case AIToolRegistry.cameraRawTool: String(localized: "Camera Raw")
+        case AIToolRegistry.blendTool: String(localized: "Blend Mode")
         default: tool
         }
     }
