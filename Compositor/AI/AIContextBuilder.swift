@@ -87,7 +87,7 @@ enum AIContextBuilder {
             // The full canvas can be enormous. Scale it off the main actor, then come back with the strings and a small JPEG.
             let encoded = await Task.detached {
                 let pictures = AIImageEncoder.encode(raster.image, selection: selectionBox)
-                let jpeg = AIImageEncoder.jpeg(raster.image, longSide: 512)
+                let jpeg = AIImageEncoder.jpeg(raster.image, longSide: AIImageEncoder.compositeLongSide)
                 return (pictures.composite, pictures.selection, jpeg)
             }.value
             context.compositePNG = encoded.0

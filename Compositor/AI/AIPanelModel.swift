@@ -158,8 +158,8 @@ final class AIPanelModel {
     use_gradient_map adds a Gradient Map adjustment. Omit the colors for black shadows and white highlights. shadows and highlights are each {red, green, blue} from 0 to 255 or 0 to 1. reversed swaps the ends. A request for a gradient map plus 明度 is this tool, then set_layer_blend_mode with Luminosity on the new layer. Those are two undos. It is not the clear Camera Raw recipe.
     use_camera_raw applies Camera Raw to the active layer. One call, one undo. The only sliders are exposure (-5 to 5), contrast, highlights, shadows, whites, blacks, temperature, tint, vibrance, saturation, texture, clarity, dehaze, vignette (-100 to 100), and grain (0 to 100). A catalog look is those numbers in one call. Do not call it for a plain "too bright" or "too dark" request; that is use_exposure.
     Pass revise true only when reviewing, to change the adjustment of that kind already in the document.
-    When the first reply allows no tools, write two parts in the user's language: 理解, what they asked for, and 方案, which of these adjustments this picture needs and the settings. A catalog look that names clarity, texture, dehaze, vibrance, vignette, or grain is one use_camera_raw call with the recipe's numbers, including its exposure, contrast, highlights, shadows, whites, blacks, temperature, tint, and saturation. A request that is only too bright or too dark is use_exposure, not Camera Raw. Change any number the attached picture requires.
-    The next request asks you to call those tools, one adjustment at a time. A later request shows the result. Compare it with the request. Revise what is still wrong, then reply with 审阅 and no tool call when it is right.
+    When the first reply allows no tools, look at the attached picture before you choose a tool. Write two parts in the user's language: 理解, what they asked for, and 方案. In 方案, name what you can see (the subject and where the color or tone is actually wrong) and one adjustment that fixes that. Use small numbers. A catalog recipe is a starting point; change or drop any number this picture does not need. Do not plan a second color adjustment for the same cast. A catalog look that names clarity, texture, dehaze, vibrance, vignette, or grain is one use_camera_raw call, not Camera Raw plus Color Balance plus Hue/Saturation. A request that is only too bright or too dark is use_exposure, not Camera Raw.
+    The next request asks you to call that one tool. A later picture shows the result. Look at it. If it went too far, revise that same adjustment weaker. If it is close, stop. Do not add another layer for the same problem.
     render_preview renders without changing anything. load_project and save_project read and write a .comp file at the current format. They do not invent a new format.
     The other tools switch tools or add a layer mask, and only when the user asks for that.
     \(AILookNotes.index)
@@ -189,11 +189,11 @@ final class AIPanelModel {
     }
 
     private static let operate = """
-    Now make that change in the software. If the plan is a Camera Raw look, call use_camera_raw once with its sliders. Otherwise use use_curves, use_color_balance, use_hue_saturation, use_exposure, use_levels, or use_gradient_map, one adjustment at a time, and leave the original pixels in place. A request that is only too bright or too dark is use_exposure. A request for a gradient map calls use_gradient_map. Black to white is the default. 明度 on that new layer is a following set_layer_blend_mode with Luminosity. A request to change the blend mode calls set_layer_blend_mode. Screen is 滤色, Soft Light is 柔光, Luminosity is 明度. Follow the plan, and change any number this picture requires. When the planned change exists, reply with no tool call.
+    Now make that one change. Look at the attached picture and use the smaller number it needs, not the catalog number. If the plan is a Camera Raw look, call use_camera_raw once. Otherwise call one of use_curves, use_color_balance, use_hue_saturation, use_exposure, use_levels, or use_gradient_map, and leave the original pixels in place. Do not also call a second color tool. A request that is only too bright or too dark is use_exposure. A gradient map is use_gradient_map, then set_layer_blend_mode with Luminosity when the plan asks for 明度. Screen is 滤色, Soft Light is 柔光, Luminosity is 明度. When that one change exists, reply with no tool call.
     """
 
     private static let review = """
-    This picture is the result of the adjustments you added. Compare it with the request. If a color the user wanted gone is still obvious, or the grade is only partly there, call the same tool with revise true and stronger numbers, or add the adjustment that failed. Do not call the result done while that is still true. If it is right, reply in the user's language, starting with 审阅, and say what you checked. Do not call a tool when it is right.
+    This picture is the result. Look at it. Name the subject and whether the problem you planned for is still visible, or whether the picture went too far. If it went too far, call the same tool with revise true and smaller numbers. Do not add another layer for the same problem. A mild remaining cast is better than a second color adjustment. If it is close, reply in the user's language, starting with 审阅, and say what you see in this picture. Do not call a tool when it is close.
     """
 
     /// Runs tool rounds until the model stops. `speakWhenIdle` stores that closing reply in the chat.
@@ -234,8 +234,8 @@ final class AIPanelModel {
                     text += preview == nil
                         ? " The render failed, so there is no picture to judge."
                         : reviewing
-                        ? " Render attached. Revise an adjustment that is still wrong, or add the one that is missing. If the picture meets the request, reply with no tool call."
-                        : " Render attached. Add the next adjustment from the plan. When every planned adjustment exists, reply with no tool call."
+                        ? " Render attached. Look at this picture. If it went too far, revise the same adjustment with smaller numbers. Do not add another layer for the same problem. If it is close, reply with no tool call."
+                        : " Render attached. Look at this picture. If it already does what the plan asked, or it went too far, reply with no tool call. Add another adjustment only when this picture still shows a different problem the plan named."
                 }
                 turns.append(AITurn(role: .tool, text: text, toolCallID: item.0.id, images: attach.map { [$0] } ?? []))
             }
