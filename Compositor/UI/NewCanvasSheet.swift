@@ -57,6 +57,8 @@ nonisolated enum NewCanvasBackground: String, CaseIterable, Sendable {
 
 struct NewCanvasSheet: View {
     let session: EditorSession
+    /// The rest of the interface, so this page stays readable when the canvas behind it is the opposite color.
+    @AppStorage("interfaceChrome") private var chromeRaw = "gray"
     var onCreate: ((Int, Int, Double, CGColor?) -> Void)? = nil
     var onOpen: (() -> Void)? = nil
     @State private var width = "1920"
@@ -165,6 +167,9 @@ struct NewCanvasSheet: View {
             }
         }
         .padding(28).frame(maxWidth: 500)
+        .background(Color(white: InterfaceTheme.chrome(named: chromeRaw).body), in: RoundedRectangle(cornerRadius: 16))
+        .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(Color.primary.opacity(0.14)) }
+        .preferredColorScheme(InterfaceTheme.chrome(named: chromeRaw).light ? .light : .dark)
         .disabled(session.isImporting || session.showsBusy)
         .onAppear {
             if !suggestedClipboardSize {

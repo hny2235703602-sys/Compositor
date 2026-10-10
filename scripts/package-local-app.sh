@@ -3,6 +3,7 @@
 # The signature is ad-hoc: not notarized, and not something to give to another Mac.
 # Someone else clones the repo and runs this script on their own machine.
 set -eu
+# Run this from Terminal.app: a nested sandbox cannot exec this sandboxed app, so the launch check is skipped there.
 cd "$(dirname "$0")/.."
 root=$(pwd)
 dd="${COMPOSITOR_DD:-$root/DerivedData}"
@@ -36,22 +37,38 @@ log=$(mktemp)
 "$app/Contents/MacOS/Compositor" >"$log" 2>&1 &
 pid=$!
 sleep 2
-if ! kill -0 "$pid" 2>/dev/null; then
+if kill -0 "$pid" 2>/dev/null; then
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+elif grep -E -i 'sandbox|library load' "$log" >/dev/null; then
+  echo "Skipped: this shell cannot launch a sandboxed app; run scripts/package-local-app.sh from Terminal.app."
+else
   echo "The app quit at launch:" >&2
   cat "$log" >&2
   rm -f "$log"
   exit 1
 fi
-kill "$pid" 2>/dev/null || true
-wait "$pid" 2>/dev/null || true
 rm -f "$log"
 
-dest="$HOME/Desktop/Compositor.app"
+# Desktop/Compositor.app is the copy opened every day, so this script never renames it.
+# The new build is Compositor-ai.app. ditto writes that into a temp directory first;
+# only a finished copy is moved into place, so a failed copy cannot leave half an app there.
+dest="$HOME/Desktop/Compositor-ai.app"
+stage=$(mktemp -d "${TMPDIR:-/tmp}/compositor-package.XXXXXX")
+ditto "$app" "$stage/Compositor-ai.app"
 if [ -d "$dest" ]; then
-  bak="$dest.bak-$(date +%s)"
-  mv "$dest" "$bak"
-  echo "Moved the previous app to $bak"
+  held="$stage/held.app"
+  mv "$dest" "$held"
+  if ! mv "$stage/Compositor-ai.app" "$dest"; then
+    mv "$held" "$dest"
+    rm -rf "$stage"
+    echo "Could not replace $dest; the previous copy is still there." >&2
+    exit 1
+  fi
+else
+  mv "$stage/Compositor-ai.app" "$dest"
 fi
-ditto "$app" "$dest"
+rm -rf "$stage"
 echo "Packaged $dest"
+echo "Left $HOME/Desktop/Compositor.app alone."
 open "$dest"

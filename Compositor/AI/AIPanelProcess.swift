@@ -16,11 +16,11 @@ enum AIPanelProcess {
         return url
     }
 
-    static func complete(endpoint: String, model: String, apiKey: String, turns: [AITurn], tools: [AIToolSpec]) async throws -> AICompletion {
+    static func complete(endpoint: String, model: String, apiKey: String, turns: [AITurn], tools: [AIToolSpec], workers: AIPanelWorkerHandle = .shared) async throws -> AICompletion {
         let fallback = OpenAICompatibleProvider(endpoint: endpoint, model: model, apiKey: apiKey)
         guard let worker = workerURL() else { return try await fallback.complete(turns, tools: tools) }
         let request = AIPanelWireRequest(kind: "complete", endpoint: endpoint, model: model, apiKey: apiKey, turns: turns, tools: tools)
-        let launch = await launch(executable: worker, request: try JSONEncoder().encode(request), timeout: OpenAICompatibleProvider.replyTimeout + 30)
+        let launch = await launch(executable: worker, request: try JSONEncoder().encode(request), timeout: OpenAICompatibleProvider.replyTimeout + 30, workers: workers)
         if launch.cancelled { throw CancellationError() }
         if let output = launch.output { return try completion(from: output) }
         if launch.spawnFailed { return try await fallback.complete(turns, tools: tools) }
@@ -43,7 +43,7 @@ enum AIPanelProcess {
     }
 
     /// Runs `executable` off the main thread. A non-zero exit, including a crash, becomes `fault` and does not escape.
-    static func launch(executable: URL, request: Data, timeout: TimeInterval) async -> Launch {
+    static func launch(executable: URL, request: Data, timeout: TimeInterval, workers: AIPanelWorkerHandle = .shared) async -> Launch {
         await Task.detached(priority: .userInitiated) {
             let process = Process()
             process.executableURL = executable
@@ -57,8 +57,8 @@ enum AIPanelProcess {
             } catch {
                 return Launch(fault: "The assistant could not be started (\(error.localizedDescription)). The editor was not affected.", spawnFailed: true)
             }
-            AIPanelWorkerHandle.shared.track(process)
-            defer { AIPanelWorkerHandle.shared.forget(process) }
+            workers.track(process)
+            defer { workers.forget(process) }
             do {
                 try input.fileHandleForWriting.write(contentsOf: request)
                 try input.fileHandleForWriting.close()
@@ -109,8 +109,10 @@ struct AIIsolatedProvider: AIProvider {
     var model: String
     var apiKey: String
 
+    var workers = AIPanelWorkerHandle.shared
+
     func complete(_ turns: [AITurn], tools: [AIToolSpec]) async throws -> AICompletion {
-        try await AIPanelProcess.complete(endpoint: endpoint, model: model, apiKey: apiKey, turns: turns, tools: tools)
+        try await AIPanelProcess.complete(endpoint: endpoint, model: model, apiKey: apiKey, turns: turns, tools: tools, workers: workers)
     }
 }
 
@@ -132,6 +134,7 @@ final class AIPanelWorkerHandle: @unchecked Sendable {
         lock.unlock()
     }
 
+    /// Ends the processes this handle is tracking. Another handle's processes keep running.
     func stopAll() {
         lock.lock()
         let running = processes

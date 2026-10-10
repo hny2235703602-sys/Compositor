@@ -5,13 +5,13 @@ struct AIPanelView: View {
     var width: CGFloat = 320
     /// Saves and opens go through the window's controller so a write is not reloaded as someone else's change.
     var controller: ProjectController? = nil
-    /// Collapses the drawer. The view stays mounted so the conversation is still there when it opens again.
+    /// Collapses the drawer. The model stays on the window, so closing this view does not stop a request.
     var onClose: () -> Void = {}
     static let widths: ClosedRange<Double> = 260...480
 
     @AppStorage("aiEndpoint") private var endpoint = "https://api.openai.com/v1"
     @AppStorage("aiModel") private var modelName = "gpt-4o"
-    @State private var model = AIPanelModel()
+    @Bindable var model: AIPanelModel
     @State private var keyDraft = ""
     @State private var keySuffix: String?
     @State private var keyError: String?
@@ -52,7 +52,6 @@ struct AIPanelView: View {
             keySuffix = AICredentials.suffix()
             if keySuffix == nil { showsConnection = true }
         }
-        .onDisappear { model.cancel() }
     }
 
     private var header: some View {
@@ -107,9 +106,11 @@ struct AIPanelView: View {
                     }
                     ForEach(model.messages) { message in
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(message.role == .user ? "You" : "Assistant")
-                                .font(.system(size: 10, weight: .semibold)).foregroundStyle(.tertiary)
+                            Text(messageLabel(message.role))
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(message.role == .error ? Color.red : Color.secondary)
                             Text(message.text).font(.system(size: 12)).textSelection(.enabled)
+                                .foregroundStyle(message.role == .error ? Color.red : Color.primary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -121,6 +122,14 @@ struct AIPanelView: View {
             .onChange(of: model.messages.count) { _, _ in
                 if let last = model.messages.last { proxy.scrollTo(last.id, anchor: .bottom) }
             }
+        }
+    }
+
+    private func messageLabel(_ role: AIChatMessage.Role) -> String {
+        switch role {
+        case .user: uiName("You")
+        case .assistant: uiName("Assistant")
+        case .error: uiName("Error")
         }
     }
 

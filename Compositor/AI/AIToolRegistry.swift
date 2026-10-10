@@ -111,7 +111,7 @@ enum AIToolRegistry {
             description: "Render the current document and attach the picture. Does not change the document.",
             parameters: emptyParameters))
         specs.append(AIToolSpec(name: loadTool,
-            description: "Open a .comp file with ProjectStore.load. Replaces the open document and clears undo. Format stays the file's own version.",
+            description: "Open a .comp file with ProjectStore.load. Asks before replacing unsaved edits; Cancel leaves the document alone. A successful open clears undo. Format stays the file's own version.",
             parameters: pathParameters))
         specs.append(AIToolSpec(name: saveTool,
             description: "Write the open document with ProjectStore.save, at format version \(ProjectManifest.current). Omit path to save the open project.",
@@ -131,14 +131,14 @@ enum AIToolRegistry {
         case levelsTool: return useLevels(call, on: session)
         case gradientMapTool: return useGradientMap(call, on: session)
         case cameraRawTool: return await useCameraRaw(call, on: session)
-        case previewTool: return AIToolOutcome(text: "Rendered the current document.", changedDocument: false, wantsPreview: true)
+        case previewTool: return AIToolOutcome(text: String(localized: "Rendered the current document."), changedDocument: false, wantsPreview: true)
         case loadTool: return await loadProject(call, on: session, controller: controller)
         case saveTool: return await saveProject(call, on: session, controller: controller)
         default: break
         }
         let commands = CommandPaletteEntry.layerCommands(for: session) + CommandPaletteEntry.tools(for: session)
         guard let entry = commands.first(where: { functionName($0.id) == call.name }) else {
-            return .unchanged("Unknown tool \(call.name). Only listed commands can run, and the document was not changed.")
+            return .unchanged(String(format: String(localized: "Unknown tool %@. Only listed commands can run, and the document was not changed."), call.name))
         }
         return run(entry, on: session)
     }
@@ -182,24 +182,24 @@ enum AIToolRegistry {
     private static func setOpacity(_ call: AIToolCall, on session: EditorSession) -> AIToolOutcome {
         guard let percent = argument(named: "percent", in: call.arguments) ?? argument(named: "opacity", in: call.arguments),
               let value = opacityValue(from: percent) else {
-            return .unchanged("set_layer_opacity needs percent from 0 to 100. The document was not changed.")
+            return .unchanged(String(localized: "set_layer_opacity needs percent from 0 to 100. The document was not changed."))
         }
         let entry = CommandPaletteEntry(id: "Layer Opacity", shortcut: nil, isEnabled: session.canEditOpacity,
             perform: { session.setLayerOpacity(value) })
         let outcome = run(entry, on: session)
         guard outcome.changedDocument else { return outcome }
-        return .changed("Ran Layer Opacity. Opacity is now \(Int((value * 100).rounded()))%.")
+        return .changed(String(format: String(localized: "Ran Layer Opacity. Opacity is now %lld%%."), Int64((value * 100).rounded())))
     }
 
     /// The active layer only. `blendMode` must be a `LayerBlendMode` raw value. Opacity, when present, shares that undo step.
     private static func setBlendMode(_ call: AIToolCall, on session: EditorSession) -> AIToolOutcome {
         guard let name = stringArgument(named: "blendMode", in: call.arguments),
               let mode = blendMode(named: name) else {
-            return .unchanged("set_layer_blend_mode needs a blend mode name. The document was not changed.")
+            return .unchanged(String(localized: "set_layer_blend_mode needs a blend mode name. The document was not changed."))
         }
         let opacity = argument(named: "opacity", in: call.arguments)
         if let opacity, opacityValue(from: opacity) == nil {
-            return .unchanged("set_layer_blend_mode opacity is 0 to 100. The document was not changed.")
+            return .unchanged(String(localized: "set_layer_blend_mode opacity is 0 to 100. The document was not changed."))
         }
         let value = opacity.flatMap { opacityValue(from: $0) }
         let entry = CommandPaletteEntry(id: "Layer Blend Mode", shortcut: nil, isEnabled: session.canEditAppearance,
@@ -209,8 +209,10 @@ enum AIToolRegistry {
             })
         let outcome = run(entry, on: session)
         guard outcome.changedDocument else { return outcome }
-        var text = "Ran Layer Blend Mode. Blend mode is now \(mode.rawValue)."
-        if let value { text += " Opacity is now \(Int((value * 100).rounded()))%." }
+        var text = String(format: String(localized: "Ran Layer Blend Mode. Blend mode is now %@."), mode.rawValue)
+        if let value {
+            text += String(format: String(localized: " Opacity is now %lld%%."), Int64((value * 100).rounded()))
+        }
         return .changed(text)
     }
 
@@ -223,21 +225,21 @@ enum AIToolRegistry {
 
     private static func useCurves(_ call: AIToolCall, on session: EditorSession) -> AIToolOutcome {
         guard let curve = curve(from: call.arguments) else {
-            return .unchanged("use_curves needs an RGB curve that is not a straight line. The document was not changed.")
+            return .unchanged(String(localized: "use_curves needs an RGB curve that is not a straight line. The document was not changed."))
         }
         return place(.curves, revise: flag("revise", in: call.arguments), on: session) { $0.curves = curve }
     }
 
     private static func useColorBalance(_ call: AIToolCall, on session: EditorSession) -> AIToolOutcome {
         guard let balance = colorBalance(from: call.arguments) else {
-            return .unchanged("use_color_balance needs a slider from -100 to 100. The document was not changed.")
+            return .unchanged(String(localized: "use_color_balance needs a slider from -100 to 100. The document was not changed."))
         }
         return place(.colorBalance, revise: flag("revise", in: call.arguments), on: session) { $0.colorBalance = balance }
     }
 
     private static func useHueSaturation(_ call: AIToolCall, on session: EditorSession) -> AIToolOutcome {
         guard let settings = hueSettings(from: call.arguments) else {
-            return .unchanged("use_hue_saturation needs a Master slider or a bands entry. The document was not changed.")
+            return .unchanged(String(localized: "use_hue_saturation needs a Master slider or a bands entry. The document was not changed."))
         }
         return place(.hsv, revise: flag("revise", in: call.arguments), on: session) { $0.hsvSettings = settings }
     }
@@ -291,7 +293,7 @@ enum AIToolRegistry {
         settings.gamma = argument(named: "gamma", in: call.arguments) ?? 1
         settings = settings.normalized
         guard settings != ExposureSettings() else {
-            return .unchanged("use_exposure needs an exposure, offset, or gamma. The document was not changed.")
+            return .unchanged(String(localized: "use_exposure needs an exposure, offset, or gamma. The document was not changed."))
         }
         return place(.exposure, revise: flag("revise", in: call.arguments), on: session) { $0.exposure = settings }
     }
@@ -305,7 +307,7 @@ enum AIToolRegistry {
         if let outputWhite = argument(named: "outputWhite", in: call.arguments) { range.outputWhite = outputWhite }
         range = range.normalized
         guard range != LevelRange() else {
-            return .unchanged("use_levels needs a black point, white point, gamma, or output level. The document was not changed.")
+            return .unchanged(String(localized: "use_levels needs a black point, white point, gamma, or output level. The document was not changed."))
         }
         var settings = LevelsSettings()
         settings.ranges[0] = range
@@ -316,17 +318,17 @@ enum AIToolRegistry {
     private static func useGradientMap(_ call: AIToolCall, on session: EditorSession) -> AIToolOutcome {
         var settings = GradientMapSettings()
         if let shadows = adjustmentColor(named: "shadows", in: call.arguments) {
-            guard let shadows else { return .unchanged("use_gradient_map shadows need red, green, and blue from 0 to 255. The document was not changed.") }
+            guard let shadows else { return .unchanged(String(localized: "use_gradient_map shadows need red, green, and blue from 0 to 255. The document was not changed.")) }
             settings.shadows = shadows
         }
         if let highlights = adjustmentColor(named: "highlights", in: call.arguments) {
-            guard let highlights else { return .unchanged("use_gradient_map highlights need red, green, and blue from 0 to 255. The document was not changed.") }
+            guard let highlights else { return .unchanged(String(localized: "use_gradient_map highlights need red, green, and blue from 0 to 255. The document was not changed.")) }
             settings.highlights = highlights
         }
         settings.reversed = flag("reversed", in: call.arguments)
         settings = settings.normalized
         guard settings.isValid else {
-            return .unchanged("use_gradient_map needs colors from 0 to 255. The document was not changed.")
+            return .unchanged(String(localized: "use_gradient_map needs colors from 0 to 255. The document was not changed."))
         }
         return place(.gradientMap, revise: flag("revise", in: call.arguments), on: session) { $0.gradientMap = settings }
     }
@@ -346,23 +348,30 @@ enum AIToolRegistry {
     /// Bakes Camera Raw into the active layer. `commitFilter` records the one undo step.
     private static func useCameraRaw(_ call: AIToolCall, on session: EditorSession) async -> AIToolOutcome {
         guard let raw = cameraRaw(from: call.arguments) else {
-            return .unchanged("use_camera_raw needs one of its sliders set. The document was not changed.")
+            return .unchanged(String(localized: "use_camera_raw needs one of its sliders set. The document was not changed."))
         }
-        guard session.filterEdit == nil else {
-            return .unchanged("A filter is already open. The document was not changed.")
+        // The same gate the Filter menu uses, checked here so a refused call never reaches beginFilter.
+        if session.filterEdit != nil {
+            return .unchanged(String(localized: "A filter is already open. The document was not changed."))
+        }
+        if session.hueSaturation != nil {
+            return .unchanged(String(localized: "Hue/Saturation is open. The document was not changed."))
+        }
+        if !session.canAdjustColors {
+            return .unchanged(String(localized: "Camera Raw needs one layer with pixels and no other filter open. The document was not changed."))
         }
         session.beginFilter(.cameraRaw)
         guard let edit = session.filterEdit, edit.kind == .cameraRaw else {
-            return .unchanged("Camera Raw could not start. The document was not changed.")
+            return .unchanged(String(localized: "Camera Raw could not start. The document was not changed."))
         }
         edit.settings.cameraRaw = raw
         let steps = session.history.undoCount
         await session.commitFilter()
         guard session.filterEdit == nil, session.history.undoCount > steps else {
             session.cancelFilter()
-            return .unchanged("Camera Raw was not applied. The document was not changed.")
+            return .unchanged(String(localized: "Camera Raw was not applied. The document was not changed."))
         }
-        return .changed("Applied Camera Raw. Undo puts the layer's pixels back.")
+        return .changed(String(localized: "Applied Camera Raw. Undo puts the layer's pixels back."))
     }
 
     /// The fifteen catalog sliders. Anything else in the arguments is ignored. All zeros are refused.
@@ -400,14 +409,14 @@ enum AIToolRegistry {
         let name = uiName(kind.rawValue)
         if revise, session.document?.layers.contains(where: { $0.adjustment?.kind == kind }) == true {
             guard session.reviseAdjustment(kind, configure: configure) else {
-                return .unchanged("The \(kind.rawValue) adjustment was not changed.")
+                return .unchanged(String(format: String(localized: "The %@ adjustment was not changed."), kind.rawValue))
             }
-            return .changed(String(localized: "Revised the \(name) adjustment. Opening it shows the settings that were used."))
+            return .changed(String(format: String(localized: "Revised the %@ adjustment. Opening it shows the settings that were used."), name))
         }
         guard session.insertAdjustment(kind, configure: configure) else {
-            return .unchanged("The \(kind.rawValue) adjustment was not changed.")
+            return .unchanged(String(format: String(localized: "The %@ adjustment was not changed."), kind.rawValue))
         }
-        return .changed(String(localized: "Added an adjustment layer (\(name)). Opening it shows the settings that were used."))
+        return .changed(String(format: String(localized: "Added an adjustment layer (%@). Opening it shows the settings that were used."), name))
     }
 
     private static func curve(from arguments: String) -> CurvesSettings? {
@@ -459,26 +468,18 @@ enum AIToolRegistry {
 
     private static func loadProject(_ call: AIToolCall, on session: EditorSession, controller: ProjectController?) async -> AIToolOutcome {
         guard let url = fileURL(pathArgument(in: call.arguments), fallback: session.projectURL, allowOpenProject: true) else {
-            return .unchanged("load_project needs a .comp file under the home directory. The document was not changed.")
+            return .unchanged(String(localized: "load_project needs a .comp file under the home directory. The document was not changed."))
         }
-        let scoped = url.startAccessingSecurityScopedResource()
-        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-        do {
-            let snapshot = try await ProjectStore.shared.load(from: url)
-            session.installProject(snapshot, from: url)
-            await controller?.rememberProjectDigest(for: url)
-            controller?.watchProject(at: url)
-            return AIToolOutcome(text: "Opened \(url.lastPathComponent), format version \(snapshot.manifest.version). Undo was cleared.",
-                                 changedDocument: false, wantsPreview: true, listInSession: true)
-        } catch {
-            return .unchanged("Could not open \(url.lastPathComponent) (\(error.localizedDescription)). The document was not changed.")
+        guard let controller, controller.session === session else {
+            return .unchanged(String(localized: "load_project needs the project window. The document was not changed."))
         }
+        return await controller.loadForAssistant(url)
     }
 
     private static func saveProject(_ call: AIToolCall, on session: EditorSession, controller: ProjectController?) async -> AIToolOutcome {
-        guard let snapshot = session.projectSnapshot() else { return .unchanged("Nothing to save. The document was not changed.") }
+        guard let snapshot = session.projectSnapshot() else { return .unchanged(String(localized: "Nothing to save. The document was not changed.")) }
         guard let url = fileURL(pathArgument(in: call.arguments), fallback: session.projectURL, allowOpenProject: true) else {
-            return .unchanged("save_project needs the open project, or a .comp path under the home directory. Nothing was written.")
+            return .unchanged(String(localized: "save_project needs the open project, or a .comp path under the home directory. Nothing was written."))
         }
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
@@ -491,10 +492,10 @@ enum AIToolRegistry {
             session.history.markSaved(revision)
             await controller?.rememberProjectDigest(for: url)
             controller?.watchProject(at: url)
-            return AIToolOutcome(text: "Saved \(url.lastPathComponent), format version \(snapshot.manifest.version).",
+            return AIToolOutcome(text: String(format: String(localized: "Saved %@, format version %lld."), url.lastPathComponent, Int64(snapshot.manifest.version)),
                                  changedDocument: false, wantsPreview: false, listInSession: true)
         } catch {
-            return .unchanged("Could not save \(url.lastPathComponent) (\(error.localizedDescription)). Nothing was written.")
+            return .unchanged(String(format: String(localized: "Could not save %@ (%@). Nothing was written."), url.lastPathComponent, error.localizedDescription))
         }
     }
 
@@ -514,7 +515,7 @@ enum AIToolRegistry {
     }
 
     private static func run(_ entry: CommandPaletteEntry, on session: EditorSession) -> AIToolOutcome {
-        guard entry.isEnabled else { return .unchanged("\(entry.id) is not available. The document was not changed.") }
+        guard entry.isEnabled else { return .unchanged(String(format: String(localized: "%@ is not available. The document was not changed."), entry.id)) }
         let steps = session.history.undoCount
         // Nested with the command's own begin/end, so a command that already records history still becomes one undo.
         session.history.begin(entry.id, document: session.document, selection: session.activeLayerID)
@@ -523,13 +524,13 @@ enum AIToolRegistry {
         session.history.end(document: session.document, selection: session.activeLayerID)
         if let failure {
             if session.history.undoCount > steps {
-                return AIToolOutcome(text: "\(entry.id) failed (\(failure)). Undo will put it back. The editor is unaffected.",
+                return AIToolOutcome(text: String(format: String(localized: "%@ failed (%@). Undo will put it back. The editor is unaffected."), entry.id, failure),
                                      changedDocument: true, wantsPreview: false, listInSession: true)
             }
-            return .unchanged("\(entry.id) failed (\(failure)). The document was not changed. The editor is unaffected.")
+            return .unchanged(String(format: String(localized: "%@ failed (%@). The document was not changed. The editor is unaffected."), entry.id, failure))
         }
-        guard session.history.undoCount > steps else { return .unchanged("Ran \(entry.id). The document was unchanged.") }
-        return .changed("Ran \(entry.id).")
+        guard session.history.undoCount > steps else { return .unchanged(String(format: String(localized: "Ran %@. The document was unchanged."), entry.id)) }
+        return .changed(String(format: String(localized: "Ran %@."), entry.id))
     }
 
     private static func flag(_ key: String, in arguments: String) -> Bool {

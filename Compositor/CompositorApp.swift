@@ -4,6 +4,8 @@ import Sparkle
 @main
 struct CompositorApp: App {
     @NSApplicationDelegateAdaptor(CompositorApplicationDelegate.self) private var applicationDelegate
+    /// The same stored flag ContentView uses for the current window's assistant drawer.
+    @AppStorage("aiPanelShown") private var aiPanelShown = false
     private var session: EditorSession { applicationDelegate.session }
     var body: some Scene {
         Window("Compositor", id: "editor") {
@@ -158,6 +160,13 @@ struct CompositorApp: App {
                             Button("Clear Guides") { session.clearGuides() }
                                 .disabled(!session.canClearGuides)
                         }
+                    }
+                    // Its own group: the View commands above are already at the ten-item builder limit.
+                    // Left enabled with no document on purpose. The assistant can still answer;
+                    // AIContextBuilder reports compositeError instead of refusing to open.
+                    CommandGroup(after: .toolbar) {
+                        Button(aiPanelShown ? "Hide Assistant" : "Show Assistant") { aiPanelShown.toggle() }
+                            .configuredKeyboardShortcut("a", modifiers: [.command, .shift])
                     }
                     // ⌘H toggles the Move tool's transform controls instead of hiding the app, so Hide keeps its
                     // place in the app menu without the shortcut.

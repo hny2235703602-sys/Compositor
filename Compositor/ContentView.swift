@@ -4,6 +4,12 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     /// The Layers panel's width, remembered across launches.
     @AppStorage("layersPanelWidth") private var layersPanelWidth = 252.0
+    /// White, gray, or black around the canvas.
+    @AppStorage("canvasSurround") private var surroundRaw = "gray"
+    /// White, gray, or black for the rest of the interface.
+    @AppStorage("interfaceChrome") private var chromeRaw = "gray"
+    /// `en` or `zh-Hans`. Empty until the user picks one, so a fresh launch keeps the system language.
+    @AppStorage("interfaceLanguage") private var languageRaw = ""
     /// The AI panel's width, remembered across launches. The panel itself stays closed until it is opened.
     @AppStorage("aiPanelWidth") private var aiPanelWidth = 320.0
     @AppStorage("aiPanelShown") private var aiPanelShown = false
@@ -20,6 +26,11 @@ struct ContentView: View {
     @State private var isDropTargeted = false
     /// The window's width, so the tab strip can use the toolbar's free space.
     @State private var windowWidth: CGFloat = 1180
+    /// Which tool the pointer is over, and where its button sits in the window, so the name can sit beside the rail.
+    @State private var hoveredTool: NavigationTool?
+    @State private var toolFrames: [NavigationTool: CGRect] = [:]
+    /// Outlives the drawer. Closing the panel, or Canvas Only, removes the view and must not drop the conversation.
+    @State private var assistant = AIPanelModel()
     /// A layer dragged from this canvas's own tab has nowhere to go, so the canvas doesn't light up for it.
     private var acceptsDrop: Bool {
         guard let workspace = applicationDelegate?.workspace else { return true }
@@ -118,13 +129,9 @@ struct ContentView: View {
                     LayersPanel(session: session, width: layersPanelWidth)
                     if aiPanelShown {
                         PanelResizeEdge(width: $aiPanelWidth, range: AIPanelView.widths)
+                        AIPanelView(session: session, width: aiPanelWidth, controller: applicationDelegate?.projects,
+                                    onClose: { aiPanelShown = false }, model: assistant)
                     }
-                    AIPanelView(session: session, width: aiPanelWidth, controller: applicationDelegate?.projects,
-                                onClose: { aiPanelShown = false })
-                        .frame(width: aiPanelShown ? aiPanelWidth : 0, alignment: .trailing)
-                        .clipped()
-                        .allowsHitTesting(aiPanelShown)
-                        .accessibilityHidden(!aiPanelShown)
                 }
             }
             if !session.canvasOnly {
@@ -134,12 +141,13 @@ struct ContentView: View {
                     .modifier(WidthReader(width: $windowWidth))
             }
         }
+        .overlay { toolHoverTip }
     }
 
     // Split again for 1.1: the chain outgrew the type checker once more.
     @ViewBuilder private var editorChrome: some View {
         editorStack
-        .background(Color(white: 0.14))
+        .background(Color(white: InterfaceTheme.chrome(named: chromeRaw).body))
         .background {
             if let applicationDelegate, applicationDelegate.projects.workspace == nil {
                 ProjectWindowBridge(controller: applicationDelegate.projects).frame(width: 0, height: 0)
@@ -173,7 +181,14 @@ struct ContentView: View {
             }
         }
         .onAppear { applicationDelegate?.showEditor = { openWindow(id: "editor") } }
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(InterfaceTheme.chrome(named: chromeRaw).light ? .light : .dark)
+        .environment(\.locale, themeLocale)
+        .onAppear { InterfaceTheme.applyChrome(chromeRaw) }
+        .onChange(of: surroundRaw) { _, _ in session.refreshCanvasPreview?() }
+        .onChange(of: chromeRaw) { _, value in
+            InterfaceTheme.applyChrome(value)
+            session.refreshCanvasPreview?()
+        }
         // Canvas Only (F): the canvas runs up under where the title bar was, so no gray strip is left across the top.
         // The toolbar itself is hidden and shown by the window (see `toggleCanvasOnly`), which lays its buttons out
         // again properly; hidden here instead, it came back with the tabs over the window buttons.
@@ -181,10 +196,13 @@ struct ContentView: View {
         .navigationTitle(session.projectURL?.deletingPathExtension().lastPathComponent ?? "Untitled")
         .toolbar {
             ToolbarItem(placement: .navigation) {
-                Button { requestNewCanvas() } label: { Label("New canvas", systemImage: "plus") }
-                    .help("New canvas (⌘N)").accessibilityIdentifier("newCanvasToolbar")
-                    .disabled(session.isImporting || session.showsBusy || session.levels != nil)
-                    .modifier(NewProjectDropTarget(workspace: applicationDelegate?.workspace))
+                fileMenu
+            }
+            ToolbarItem(placement: .navigation) {
+                settingsMenu
+            }
+            ToolbarItem(placement: .navigation) {
+                themeMenu
             }
             ToolbarSpacer(.fixed, placement: .navigation)
             if let workspace = applicationDelegate?.workspace {
@@ -202,9 +220,19 @@ struct ContentView: View {
             ToolbarSpacer(.flexible, placement: .navigation)
             ToolbarItem(placement: .primaryAction) {
                 Button { aiPanelShown.toggle() } label: {
-                    Label("Assistant", systemImage: "sparkles")
+                    HStack(spacing: 4) {
+                        Image(systemName: "sparkles")
+                        if assistant.isSending {
+                            ProgressView().controlSize(.mini)
+                                .accessibilityIdentifier("aiToggle")
+                        } else if !aiPanelShown, assistant.error != nil {
+                            Circle().fill(.red).frame(width: 8, height: 8)
+                                .accessibilityIdentifier("aiToggle")
+                        }
+                    }
                 }
-                .help(aiPanelShown ? "Hide Assistant" : "Show Assistant")
+                .help(assistantToolbarHelp)
+                .accessibilityLabel(assistantToolbarHelp)
                 .accessibilityIdentifier("toggleAssistant")
             }
             ToolbarItem(placement: .primaryAction) {
@@ -310,6 +338,159 @@ struct ContentView: View {
                 Button("OK") { session.cropError = nil }
             } message: { Text(session.cropError ?? "") }
     }
+    /// The same file commands as the File menu. Shortcuts stay on that menu, so they are not offered twice.
+    private var fileMenu: some View {
+        let projects = applicationDelegate?.projects
+        let canStart = projects?.canStart ?? true
+        return Menu {
+            Group {
+                Button("New Canvas…") { requestNewCanvas() }
+                    .disabled(!canStart)
+                Button("Open Project…") { Task { await projects?.open() } }
+                    .disabled(!canStart || projects == nil)
+                Menu("Open Recent") {
+                    ForEach(RecentProjects.shared.urls, id: \.self) { url in
+                        Button(url.deletingPathExtension().lastPathComponent) {
+                            Task { await projects?.open(url) }
+                        }
+                    }
+                    Divider()
+                    Button("Clear Menu") { RecentProjects.shared.clear() }
+                        .disabled(RecentProjects.shared.urls.isEmpty)
+                }
+                .disabled(!canStart || projects == nil)
+                Button("Import Images…") { session.showsImporter = true }
+                    .disabled(session.levels != nil || session.showsBusy || session.isImporting || session.showsNewDocument)
+            }
+            Group {
+                Divider()
+                Button("Save") { Task { await projects?.save() } }
+                    .disabled(session.document == nil || !canStart)
+                Button("Save As…") { Task { await projects?.save(asNew: true) } }
+                    .disabled(session.document == nil || !canStart)
+                Divider()
+                Button("Export PNG…") { Task { await projects?.exportPNG() } }
+                    .disabled(session.document == nil || !canStart)
+                Button("Export JPEG…") { Task { await projects?.exportJPEG() } }
+                    .disabled(session.document == nil || !canStart)
+                Divider()
+                Button("Close Project") {
+                    if let window = projects?.window { Task { await projects?.close(window) } }
+                }
+                .disabled(!canStart || projects == nil)
+            }
+        } label: {
+            Image(systemName: "doc")
+        }
+        .accessibilityLabel(uiName("File"))
+        .accessibilityIdentifier("fileMenu")
+        .modifier(NewProjectDropTarget(workspace: applicationDelegate?.workspace))
+    }
+
+    /// Preferences that also live in the menus. No shortcuts here: the menus already own those keys.
+    private var settingsMenu: some View {
+        Menu {
+            Button("Keyboard Shortcuts…") { ShortcutSettings.shared.show() }
+            Button("Grid Settings…") { Task { await applicationDelegate?.projects.gridSettings() } }
+                .disabled(session.document == nil)
+            Divider()
+            Group {
+                Toggle("Pixel Grid (800% and above)", isOn: Binding(get: { session.showsPixelGrid }, set: { session.showsPixelGrid = $0 }))
+                Toggle("Show Transform Controls", isOn: Binding(get: { session.showsTransformControls }, set: { session.showsTransformControls = $0 }))
+                    .disabled(session.tool != .move || session.document == nil)
+                Toggle("Rulers", isOn: Binding(get: { session.showsRulers }, set: { session.showsRulers = $0 }))
+                    .disabled(session.document == nil)
+                Toggle("Grid", isOn: Binding(get: { session.showsGrid }, set: { session.showsGrid = $0 }))
+                    .disabled(session.document == nil)
+                Toggle("Guides", isOn: Binding(get: { session.showsGuides }, set: { session.showsGuides = $0 }))
+                    .disabled(session.document == nil)
+                Toggle("Lock Guides", isOn: Binding(get: { session.locksGuides }, set: { session.locksGuides = $0 }))
+                    .disabled(session.document == nil)
+            }
+            Group {
+                Toggle("Snap", isOn: Binding(get: { session.snapEnabled }, set: { session.snapEnabled = $0 }))
+                    .disabled(session.document == nil)
+                Menu("Snap To") {
+                    Toggle("Guides", isOn: Binding(get: { session.snapToGuides }, set: { session.snapToGuides = $0 }))
+                    Toggle("Grid", isOn: Binding(get: { session.snapToGrid }, set: { session.snapToGrid = $0 }))
+                    Toggle("Layers", isOn: Binding(get: { session.snapToLayers }, set: { session.snapToLayers = $0 }))
+                    Toggle("Document Bounds", isOn: Binding(get: { session.snapToDocumentBounds }, set: { session.snapToDocumentBounds = $0 }))
+                }
+                .disabled(session.document == nil)
+                Button("Clear Guides") { session.clearGuides() }
+                    .disabled(!session.canClearGuides)
+            }
+        } label: {
+            Image(systemName: "gearshape")
+        }
+        .help(uiName("Settings"))
+        .accessibilityLabel(uiName("Settings"))
+        .accessibilityIdentifier("settings")
+    }
+
+    /// Canvas backdrop and the language of the interface. Plain menu items, so a click actually changes them.
+    private var themeMenu: some View {
+        Menu {
+            Menu("Background Color") {
+                surroundChoice("White", "white")
+                surroundChoice("Gray", "gray")
+                surroundChoice("Black", "black")
+            }
+            Menu("Theme Color") {
+                chromeChoice("White", "white")
+                chromeChoice("Gray", "gray")
+                chromeChoice("Black", "black")
+            }
+            Menu("Language") {
+                languageChoice("中文", "zh-Hans")
+                languageChoice("English", "en")
+            }
+        } label: {
+            Image(systemName: "paintpalette")
+        }
+        .help(uiName("Theme"))
+        .accessibilityLabel(uiName("Theme"))
+        .accessibilityIdentifier("theme")
+    }
+
+    private func surroundChoice(_ title: LocalizedStringKey, _ value: String) -> some View {
+        Button {
+            surroundRaw = value
+        } label: {
+            if surroundRaw == value { Image(systemName: "checkmark") }
+            Text(title)
+        }
+    }
+
+    private func chromeChoice(_ title: LocalizedStringKey, _ value: String) -> some View {
+        Toggle(title, isOn: Binding(get: { chromeRaw == value }, set: { if $0 { chromeRaw = value } }))
+    }
+
+    private func languageChoice(_ title: String, _ value: String) -> some View {
+        Toggle(isOn: Binding(get: { activeLanguage == value }, set: { chosen in
+            guard chosen else { return }
+            languageRaw = value
+            InterfaceTheme.applyLanguage(value)
+        })) {
+            Text(title)
+        }
+    }
+
+    private var activeLanguage: String {
+        languageRaw.isEmpty ? InterfaceTheme.startingLanguage : languageRaw
+    }
+
+    private var themeLocale: Locale {
+        Locale(identifier: languageRaw.isEmpty ? InterfaceTheme.startingLanguage : languageRaw)
+    }
+
+    /// The toolbar sparkles button, including what is happening while the drawer is closed.
+    private var assistantToolbarHelp: String {
+        if assistant.isSending { return uiName("Assistant is working") }
+        if !aiPanelShown, assistant.error != nil { return uiName("Assistant needs attention") }
+        return uiName(aiPanelShown ? "Hide Assistant" : "Show Assistant")
+    }
+
     private func requestNewCanvas() {
         if let applicationDelegate { Task { await applicationDelegate.projects.newCanvas() } }
         else { session.clearProject() }
@@ -319,9 +500,11 @@ struct ContentView: View {
         IndicatorlessScrollView {
         VStack(spacing: 10) {
             ForEach(NavigationTool.allCases.filter { $0 != .idle }, id: \.self) { tool in
+                let tip = toolTip(for: tool)
                 Button { session.selectTool(tool) } label: {
                     Group {
-                        if tool == .gradient { GradientToolIcon().frame(width: 18, height: 18) }
+                        if tool == .type { Text("T").font(.system(size: 17, weight: .medium, design: .serif)) }
+                        else if tool == .gradient { GradientToolIcon().frame(width: 18, height: 18) }
                         else if tool == .cloneStamp { CloneStampToolIcon().frame(width: 18, height: 18) }
                         else if tool == .lasso, session.lassoKind == .polygonal { PolygonalLassoToolIcon().frame(width: 18, height: 18) }
                         else if tool == .wand, session.wandMode == .object { ObjectSelectionToolIcon().frame(width: 18, height: 18) }
@@ -329,15 +512,21 @@ struct ContentView: View {
                         else { Image(systemName: tool == .marquee && session.marqueeKind == .ellipse ? "circle.dashed" : session.symbol(for: tool)).font(.system(size: 17)) }
                     }
                     .frame(width: 36, height: 36)
-                        .background(session.tool == tool ? Color.white.opacity(0.12) : .clear,
+                        .background(session.tool == tool ? Color.primary.opacity(0.12) : .clear,
                                     in: RoundedRectangle(cornerRadius: 7))
                         .overlay {
                             RoundedRectangle(cornerRadius: 7)
-                                .strokeBorder(session.tool == tool ? Color.white.opacity(0.14) : .clear)
+                                .strokeBorder(session.tool == tool ? Color.primary.opacity(0.18) : .clear)
                         }
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain).help(tool.label).accessibilityLabel(tool.label)
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(tip.name) (\(tip.shortcut))")
+                .onHover { inside in
+                    if inside { hoveredTool = tool }
+                    else if hoveredTool == tool { hoveredTool = nil }
+                }
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { toolFrames[tool] = $0 }
                 .foregroundStyle(.primary)
                 .accessibilityAddTraits(session.tool == tool ? .isSelected : [])
             }
@@ -348,6 +537,47 @@ struct ContentView: View {
         }
         .frame(width: 56)
     }
+
+    /// Name and key of the tool as its button shows it now, including a remapped shortcut.
+    private func toolTip(for tool: NavigationTool) -> (name: String, shortcut: String) {
+        let (name, definitionTitle): (String, String) = switch tool {
+        case .move: ("Move", "Move / Transform tool")
+        case .marquee: (session.marqueeKind == .ellipse ? "Elliptical Marquee" : "Rectangular Marquee", "Marquee / cycle shape")
+        case .lasso: (session.lassoKind == .polygonal ? "Polygonal Lasso" : "Lasso", "Lasso / cycle mode")
+        case .wand: (session.wandMode == .object ? "Object Selection" : "Magic Wand", "Magic")
+        case .crop: ("Crop", "Crop tool")
+        case .brush: session.brushMode == .erase ? ("Eraser", "Eraser") : ("Brush", "Brush tool")
+        case .spotHealing: ("Spot Healing Brush", "Spot Healing")
+        case .cloneStamp: ("Clone Stamp", "Clone Stamp")
+        case .blur: (session.blurMode.rawValue, "Blur / Smudge / Liquify")
+        case .gradient: ("Gradient", "Gradient tool")
+        case .shape: (session.shapeKind.rawValue, "Shape tool")
+        case .type: ("Type", "Type tool")
+        case .eyedropper: ("Eyedropper", "Eyedropper tool")
+        case .hand: ("Hand", "Hand tool")
+        case .zoom: ("Zoom", "Zoom tool")
+        case .idle: ("", "")
+        }
+        let shortcut = ShortcutDefinition.all.first { !$0.isMenu && $0.title == definitionTitle }
+            .map { ShortcutSettings.shared.chord($0).label } ?? ""
+        return (uiName(name), shortcut)
+    }
+
+    /// The label beside a tool button. The rail is only as wide as the icons, so the name is drawn over the canvas.
+    @ViewBuilder private var toolHoverTip: some View {
+        if let tool = hoveredTool, let frame = toolFrames[tool] {
+            GeometryReader { proxy in
+                let origin = proxy.frame(in: .global)
+                let tip = toolTip(for: tool)
+                Color.clear
+                    .frame(width: 0, height: 0)
+                    .overlay(alignment: .leading) { ToolRailTip(name: tip.name, shortcut: tip.shortcut).fixedSize() }
+                    .position(x: frame.maxX - origin.minX + 8, y: frame.midY - origin.minY)
+            }
+            .allowsHitTesting(false)
+        }
+    }
+
     private var welcome: some View {
         NewCanvasSheet(session: session,
             onCreate: { session.createNewProject(width: $0, height: $1, resolution: $2, background: $3) },
@@ -443,6 +673,27 @@ extension View {
     }
     deinit {
         if let monitor { NSEvent.removeMonitor(monitor) }
+    }
+}
+
+/// Name and shortcut shown beside a tool while the pointer is over it.
+private struct ToolRailTip: View {
+    let name: String
+    let shortcut: String
+    @AppStorage("interfaceChrome") private var chromeRaw = "gray"
+    var body: some View {
+        let chrome = InterfaceTheme.chrome(named: chromeRaw)
+        HStack(spacing: 8) {
+            Text(name)
+            Text(shortcut).foregroundStyle(Color.primary.opacity(0.65))
+        }
+        .font(.system(size: 12, weight: .medium))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color(white: chrome.ruler), in: RoundedRectangle(cornerRadius: 5))
+        .overlay { RoundedRectangle(cornerRadius: 5).strokeBorder(Color.primary.opacity(0.16)) }
+        .preferredColorScheme(chrome.light ? .light : .dark)
+        .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
     }
 }
 

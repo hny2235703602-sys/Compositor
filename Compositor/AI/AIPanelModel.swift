@@ -1,7 +1,7 @@
 import Foundation
 
 struct AIChatMessage: Identifiable, Equatable {
-    enum Role: Equatable { case user, assistant }
+    enum Role: Equatable { case user, assistant, error }
     var id = UUID()
     var role: Role
     var text: String
@@ -28,22 +28,33 @@ final class AIPanelModel {
     /// What the assistant is doing, or that the last request finished or stopped.
     var status: String?
     private var task: Task<Void, Never>?
+    /// Bumps on every send. A request that is already unwinding keeps the token it started with.
+    private var runToken = 0
+    /// Processes this panel started. Stop ends these only, not another tab's.
+    private let workers = AIPanelWorkerHandle()
 
-    func send(session: EditorSession, endpoint: String, modelName: String, controller: ProjectController? = nil) {
+    func send(session: EditorSession, endpoint: String, modelName: String, controller: ProjectController? = nil, provider injected: (any AIProvider)? = nil) {
         let question = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !question.isEmpty, !isSending else { return }
-        guard let key = AICredentials.load(), !key.isEmpty else {
-            error = AIProviderError.missingKey.localizedDescription
-            return
+        let provider: any AIProvider
+        if let injected {
+            provider = injected
+        } else {
+            guard let key = AICredentials.load(), !key.isEmpty else {
+                error = AIProviderError.missingKey.localizedDescription
+                return
+            }
+            provider = AIIsolatedProvider(endpoint: endpoint, model: modelName, apiKey: key, workers: workers)
         }
         draft = ""
         error = nil
+        runToken += 1
+        let token = runToken
         status = String(localized: "Reading the picture…")
         isSending = true
         messages.append(AIChatMessage(role: .user, text: question))
-        let provider = AIIsolatedProvider(endpoint: endpoint, model: modelName, apiKey: key)
         task = Task { [weak self] in
-            await self?.run(question: question, session: session, provider: provider, controller: controller)
+            await self?.run(question: question, session: session, provider: provider, controller: controller, token: token)
         }
     }
 
@@ -65,8 +76,9 @@ final class AIPanelModel {
         if result.error == nil { availableModels = result.models }
     }
 
+    /// Stops this panel's current request. Another tab's request keeps running.
     func cancel() {
-        AIPanelWorkerHandle.shared.stopAll()
+        workers.stopAll()
         task?.cancel()
         task = nil
         if isSending {
@@ -78,14 +90,22 @@ final class AIPanelModel {
     /// Change, render, and hand the picture back, until the model replies with no tool call. `roundLimit` stops a model that never finishes.
     static let roundLimit = 8
 
-    func run(question: String, session: EditorSession, provider: any AIProvider, controller: ProjectController? = nil) async {
-        defer { isSending = false }
+    func run(question: String, session: EditorSession, provider: any AIProvider, controller: ProjectController? = nil, token ownedToken: Int? = nil) async {
+        let token = ownedToken ?? runToken
+        // An older request can finish after Send has started the next one. Its cleanup must not clear that newer one.
+        defer {
+            if runToken == token { isSending = false }
+        }
         do {
-            status = String(localized: "Reading the picture…")
+            show(String(localized: "Reading the picture…"), token: token)
             let context = await AIContextBuilder.capture(session)
             var turns = [AITurn(role: .system, text: Self.instructions)]
             for message in messages.dropLast() {
-                turns.append(AITurn(role: message.role == .user ? .user : .assistant, text: message.text))
+                switch message.role {
+                case .user: turns.append(AITurn(role: .user, text: message.text))
+                case .assistant: turns.append(AITurn(role: .assistant, text: message.text))
+                case .error: break
+                }
             }
             let asked = question + "\n\n" + AIContextBuilder.summary(context) + "\n\n" + AIContextBuilder.promptJSON(context)
                 + Self.catalogNote(for: question, earlier: messages.dropLast().map(\.self))
@@ -93,15 +113,15 @@ final class AIPanelModel {
             let preview = context.modelJPEG.map { [$0] } ?? []
             turns.append(AITurn(role: .user, text: asked, images: preview))
             if AILookNotes.isQuestion(question) {
-                status = String(localized: "Answering…")
+                show(String(localized: "Answering…"), token: token)
                 _ = try await performTurns(&turns, session: session, provider: provider, controller: controller,
-                                            reviewing: false, speakWhenIdle: true)
-                status = String(localized: "Finished.")
+                                            reviewing: false, speakWhenIdle: true, token: token)
+                show(String(localized: "Finished."), token: token)
                 return
             }
             // Understand the request, then decide which adjustments this picture needs. No tools yet.
             try Task.checkCancellation()
-            status = String(localized: "Deciding what the request means…")
+            show(String(localized: "Deciding what the request means…"), token: token)
             let plan = try await provider.complete(turns, tools: [])
             let planText = plan.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             if !planText.isEmpty {
@@ -109,29 +129,38 @@ final class AIPanelModel {
                 turns.append(AITurn(role: .assistant, text: planText))
             }
             turns.append(AITurn(role: .user, text: Self.operate, images: preview))
-            status = String(localized: "Adding the adjustments…")
+            show(String(localized: "Adding the adjustments…"), token: token)
             let changed = try await performTurns(&turns, session: session, provider: provider, controller: controller,
-                                                  reviewing: false, speakWhenIdle: true)
+                                                  reviewing: false, speakWhenIdle: true, token: token)
             guard changed else {
-                status = String(localized: "Finished.")
+                show(String(localized: "Finished."), token: token)
                 return
             }
-            status = String(localized: "Checking the result…")
+            show(String(localized: "Checking the result…"), token: token)
             let reviewImage = await AIToolRegistry.renderedPreview(of: session)
             turns.append(AITurn(role: .user, text: Self.review, images: reviewImage.map { [$0] } ?? []))
             _ = try await performTurns(&turns, session: session, provider: provider, controller: controller,
-                                        reviewing: true, speakWhenIdle: true)
-            status = String(localized: "Finished.")
+                                        reviewing: true, speakWhenIdle: true, token: token)
+            show(String(localized: "Finished."), token: token)
         } catch is CancellationError {
-            status = String(localized: "Stopped.")
+            show(String(localized: "Stopped."), token: token)
             return
         } catch let urlError as URLError where urlError.code == .cancelled {
-            status = String(localized: "Stopped.")
+            show(String(localized: "Stopped."), token: token)
             return
         } catch {
+            guard runToken == token else { return }
             status = nil
-            self.error = error.localizedDescription
+            let text = error.localizedDescription
+            self.error = text
+            messages.append(AIChatMessage(role: .error, text: text))
         }
+    }
+
+    /// Writes panel status only while this request is still the current one.
+    private func show(_ text: String, token: Int) {
+        guard runToken == token else { return }
+        status = text
     }
 
     private static let instructions = """
@@ -198,11 +227,11 @@ final class AIPanelModel {
 
     /// Runs tool rounds until the model stops. `speakWhenIdle` stores that closing reply in the chat.
     private func performTurns(_ turns: inout [AITurn], session: EditorSession, provider: any AIProvider,
-                              controller: ProjectController?, reviewing: Bool, speakWhenIdle: Bool) async throws -> Bool {
+                              controller: ProjectController?, reviewing: Bool, speakWhenIdle: Bool, token: Int) async throws -> Bool {
         var changed = false
         for _ in 0..<Self.roundLimit {
             try Task.checkCancellation()
-            status = reviewing ? String(localized: "Checking the result…") : status
+            if reviewing { show(String(localized: "Checking the result…"), token: token) }
             let completion = try await provider.complete(turns, tools: AIToolRegistry.specs(for: session))
             if completion.toolCalls.isEmpty {
                 let text = completion.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -214,10 +243,10 @@ final class AIPanelModel {
             turns.append(AITurn(role: .assistant, text: completion.text ?? "", toolCalls: completion.toolCalls))
             var outcomes: [(AIToolCall, AIToolOutcome)] = []
             for call in completion.toolCalls {
-                status = Self.activity(call.name)
+                show(Self.activity(call.name), token: token)
                 let outcome = await AIToolRegistry.perform(call, on: session, controller: controller)
                 if !outcome.changedDocument {
-                    status = String(localized: "\(Self.toolTitle(call.name)) was not added. Continuing…")
+                    show(String(localized: "\(Self.toolTitle(call.name)) was not added. Continuing…"), token: token)
                 }
                 outcomes.append((call, outcome))
             }
@@ -240,7 +269,7 @@ final class AIPanelModel {
                 turns.append(AITurn(role: .tool, text: text, toolCallID: item.0.id, images: attach.map { [$0] } ?? []))
             }
         }
-        messages.append(AIChatMessage(role: .assistant, text: "Stopped after \(Self.roundLimit) rounds."))
+        messages.append(AIChatMessage(role: .error, text: String(format: String(localized: "Stopped after %lld rounds."), Int64(Self.roundLimit))))
         return changed
     }
 

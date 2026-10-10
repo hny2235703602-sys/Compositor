@@ -34,8 +34,8 @@ final class CompositorApplicationDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
         // AppKit's own switches for two of the Edit menu's text extras (see `removeSystemExtras`).
         UserDefaults.standard.register(defaults: ["NSDisabledDictationMenuItem": true, "NSDisabledCharacterPaletteMenuItem": true])
-        // Always dark, alerts and open/save panels included, whatever the Mac is set to.
-        NSApp.appearance = NSAppearance(named: .darkAqua)
+        // Alerts and open/save panels follow the theme color. White is light; gray and black stay dark.
+        InterfaceTheme.applyChrome(UserDefaults.standard.string(forKey: "interfaceChrome") ?? "gray")
         // Slider knobs snap to a click on the track instead of gliding there.
         SliderSnap.install()
     }

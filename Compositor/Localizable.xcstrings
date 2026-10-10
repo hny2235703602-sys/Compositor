@@ -401,6 +401,76 @@
         }
       }
     },
+    "File": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件"
+          }
+        }
+      }
+    },
+    "File · Drop images here for new tabs": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件 · 把图像拖到这里可开新标签"
+          }
+        }
+      }
+    },
+    "Theme Color": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "主题颜色"
+          }
+        }
+      }
+    },
+    "Theme": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "主题"
+          }
+        }
+      }
+    },
+    "Background Color": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "背景颜色"
+          }
+        }
+      }
+    },
+    "Language": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语言"
+          }
+        }
+      }
+    },
+    "Settings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置"
+          }
+        }
+      }
+    },
     "Show Assistant": {
       "localizations": {
         "zh-Hans": {
@@ -561,6 +631,16 @@
         }
       }
     },
+    "Blend Mode": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "混合模式"
+          }
+        }
+      }
+    },
     "Blend the chosen color into the edges while keeping the center unchanged": {
       "localizations": {
         "zh-Hans": {
@@ -687,6 +767,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "校准"
+          }
+        }
+      }
+    },
+    "Camera Raw": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Camera Raw"
           }
         }
       }
@@ -1971,6 +2061,16 @@
         }
       }
     },
+    "Elliptical Marquee": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "椭圆选框"
+          }
+        }
+      }
+    },
     "Empty selection": {
       "localizations": {
         "zh-Hans": {
@@ -2037,6 +2137,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "输入 1 到 %@ 像素之间的整数。"
+          }
+        }
+      }
+    },
+    "Error": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "错误"
           }
         }
       }
@@ -2697,6 +2807,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "半调线条"
+          }
+        }
+      }
+    },
+    "Hand": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "抓手"
           }
         }
       }
@@ -3701,6 +3821,16 @@
         }
       }
     },
+    "Magic Wand": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "魔棒"
+          }
+        }
+      }
+    },
     "Magic (W) · Tab switches Wand and Object": {
       "localizations": {
         "zh-Hans": {
@@ -3907,6 +4037,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "动感模糊"
+          }
+        }
+      }
+    },
+    "Move": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移动"
           }
         }
       }
@@ -4197,6 +4337,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "对象"
+          }
+        }
+      }
+    },
+    "Object Selection": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "对象选择"
           }
         }
       }
@@ -4561,6 +4711,16 @@
         }
       }
     },
+    "Polygonal Lasso": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "多边形套索"
+          }
+        }
+      }
+    },
     "Position": {
       "localizations": {
         "zh-Hans": {
@@ -4887,6 +5047,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "矩形"
+          }
+        }
+      }
+    },
+    "Rectangular Marquee": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "矩形选框"
           }
         }
       }
@@ -5747,6 +5917,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "污点修复"
+          }
+        }
+      }
+    },
+    "Spot Healing Brush": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "污点修复画笔"
           }
         }
       }
@@ -7211,6 +7391,16 @@
         }
       }
     },
+    "Stopped after %lld rounds.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已经连续改了 %lld 轮，先停下来。"
+          }
+        }
+      }
+    },
     "Answering…": {
       "localizations": {
         "zh-Hans": {
@@ -7237,6 +7427,426 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@没有加上，正在继续…"
+          }
+        }
+      }
+    },
+    "use_camera_raw needs one of its sliders set. The document was not changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Camera Raw 需要设置其中一项滑块。文档没有改动。"
+          }
+        }
+      }
+    },
+    "A filter is already open. The document was not changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已经有一个滤镜开着。文档没有改动。"
+          }
+        }
+      }
+    },
+    "Hue/Saturation is open. The document was not changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "色相/饱和度正开着。文档没有改动。"
+          }
+        }
+      }
+    },
+    "Camera Raw needs one layer with pixels and no other filter open. The document was not changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Camera Raw 需要一个带像素的图层，并且没有其他滤镜开着。文档没有改动。"
+          }
+        }
+      }
+    },
+    "Camera Raw could not start. The document was not changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Camera Raw 没能开始。文档没有改动。"
+          }
+        }
+      }
+    },
+    "Camera Raw was not applied. The document was not changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Camera Raw 没有应用。文档没有改动。"
+          }
+        }
+      }
+    },
+    "Applied Camera Raw. Undo puts the layer's pixels back.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已应用 Camera Raw。撤销会把图层像素还原。"
+          }
+        }
+      }
+    },
+    "Assistant is working": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "助手正在工作"
+          }
+        }
+      }
+    },
+    "Assistant needs attention": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "助手需要查看"
+          }
+        }
+      }
+    },
+    "Rendered the current document.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已渲染当前文档。"
+          }
+        }
+      }
+    },
+    "Unknown tool %@. Only listed commands can run, and the document was not changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未知工具 %@。只能运行列出的命令。文档没有改动。"
+          }
+        }
+      }
+    },
+    "set_layer_opacity needs percent from 0 to 100. The document was not changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "set_layer_opacity 需要 0 到 100 的百分比。文档没有改动。"
+          }
+        }
+      }
+    },
+    "Ran Layer Opacity. Opacity is now %lld%%.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已运行图层不透明度。不透明度现在是 %lld%%。"
+          }
+        }
+      }
+    },
+    "set_layer_blend_mode needs a blend mode name. The document was not changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "set_layer_blend_mode 需要一个混合模式名称。文档没有改动。"
+          }
+        }
+      }
+    },
+    "set_layer_blend_mode opacity is 0 to 100. The document was not changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "set_layer_blend_mode 的不透明度需要在 0 到 100 之间。文档没有改动。"
+          }
+        }
+      }
+    },
+    "Ran Layer Blend Mode. Blend mode is now %@.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已运行图层混合模式。混合模式现在是 %@。"
+          }
+        }
+      }
+    },
+    " Opacity is now %lld%%.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " 不透明度现在是 %lld%%。"
+          }
+        }
+      }
+    },
+    "use_curves needs an RGB curve that is not a straight line. The document was not changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "use_curves 需要一条不是直线的 RGB 曲线。文档没有改动。"
+          }
+        }
+      }
+    },
+    "use_color_balance needs a slider from -100 to 100. The document was not changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "use_color_balance 需要一个 -100 到 100 的滑块。文档没有改动。"
+          }
+        }
+      }
+    },
+    "use_hue_saturation needs a Master slider or a bands entry. The document was not changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "use_hue_saturation 需要一个主滑块或一条色带。文档没有改动。"
+          }
+        }
+      }
+    },
+    "use_exposure needs an exposure, offset, or gamma. The document was not changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "use_exposure 需要曝光、偏移或伽马。文档没有改动。"
+          }
+        }
+      }
+    },
+    "use_levels needs a black point, white point, gamma, or output level. The document was not changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "use_levels 需要黑场、白场、伽马或输出色阶。文档没有改动。"
+          }
+        }
+      }
+    },
+    "use_gradient_map shadows need red, green, and blue from 0 to 255. The document was not changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "use_gradient_map 的阴影需要 0 到 255 的红、绿、蓝。文档没有改动。"
+          }
+        }
+      }
+    },
+    "use_gradient_map highlights need red, green, and blue from 0 to 255. The document was not changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "use_gradient_map 的高光需要 0 到 255 的红、绿、蓝。文档没有改动。"
+          }
+        }
+      }
+    },
+    "use_gradient_map needs colors from 0 to 255. The document was not changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "use_gradient_map 需要 0 到 255 的颜色。文档没有改动。"
+          }
+        }
+      }
+    },
+    "The %@ adjustment was not changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@调整没有改动。"
+          }
+        }
+      }
+    },
+    "load_project needs a .comp file under the home directory. The document was not changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "load_project 需要主目录下的 .comp 文件。文档没有改动。"
+          }
+        }
+      }
+    },
+    "load_project needs the project window. The document was not changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "load_project 需要项目窗口。文档没有改动。"
+          }
+        }
+      }
+    },
+    "Nothing to save. The document was not changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有可保存的内容。文档没有改动。"
+          }
+        }
+      }
+    },
+    "save_project needs the open project, or a .comp path under the home directory. Nothing was written.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "save_project 需要当前打开的项目，或主目录下的 .comp 路径。没有写入任何东西。"
+          }
+        }
+      }
+    },
+    "Saved %@, format version %lld.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已保存 %@，格式版本 %lld。"
+          }
+        }
+      }
+    },
+    "Could not save %@ (%@). Nothing was written.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法保存 %@（%@）。没有写入任何东西。"
+          }
+        }
+      }
+    },
+    "%@ is not available. The document was not changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@不可用。文档没有改动。"
+          }
+        }
+      }
+    },
+    "%@ failed (%@). Undo will put it back. The editor is unaffected.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@失败（%@）。撤销会把它还原。编辑器没有受影响。"
+          }
+        }
+      }
+    },
+    "%@ failed (%@). The document was not changed. The editor is unaffected.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@失败（%@）。文档没有改动。编辑器没有受影响。"
+          }
+        }
+      }
+    },
+    "Ran %@. The document was unchanged.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已运行 %@。文档没有变化。"
+          }
+        }
+      }
+    },
+    "Ran %@.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已运行 %@。"
+          }
+        }
+      }
+    },
+    "Could not open %@. The file is missing. The document was not changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法打开 %@。文件不存在。文档没有改动。"
+          }
+        }
+      }
+    },
+    "A project operation is already running. The document was not changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已有项目操作在进行。文档没有改动。"
+          }
+        }
+      }
+    },
+    "Opening was cancelled. The document was not changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已取消打开。文档没有改动。"
+          }
+        }
+      }
+    },
+    "Opened %@, format version %lld. Undo was cleared.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已打开 %@，格式版本 %lld。撤销已清空。"
+          }
+        }
+      }
+    },
+    "Could not open %@ (%@). The document was not changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法打开 %@（%@）。文档没有改动。"
           }
         }
       }

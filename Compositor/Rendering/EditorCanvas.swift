@@ -649,8 +649,11 @@ final class CanvasView: NSView {
         transformOverlay = TransformOverlay(session: session)
         super.init(frame: .zero)
         session.refreshCanvasPreview = { [weak self] in
-            self?.synchronizeDisplay()
-            self?.displayIfNeeded()
+            guard let self else { return }
+            self.synchronizeDisplay()
+            // The backdrop color is not part of the display state, so a theme change still has to redraw.
+            self.needsDisplay = true
+            self.displayIfNeeded()
         }
         addSubview(lines)
         addSubview(transformOverlay)
@@ -863,8 +866,8 @@ final class CanvasView: NSView {
         }
     }
 
-    /// The gray around the canvas, black in Canvas Only (F).
-    private var surround: CGFloat { session.canvasOnly ? 0 : 0.105 }
+    /// The color around the canvas. Canvas Only (F) stays black.
+    private var surround: CGFloat { InterfaceTheme.surroundWhite(canvasOnly: session.canvasOnly) }
 
     override func draw(_ dirtyRect: NSRect) {
         // The grid and a text frame being dragged follow the pixels under them.

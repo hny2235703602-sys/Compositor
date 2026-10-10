@@ -4,6 +4,7 @@ import Testing
 @testable import Compositor
 
 @MainActor
+@Suite(.serialized)
 struct AIContextTests {
     @Test func captureReadsTheSessionAndDoesNotEditIt() async throws {
         let session = EditorSession()
@@ -86,6 +87,29 @@ struct AIContextTests {
         #expect(selection.bounds == nil)
         #expect(selection.previewPNG == nil)
         #expect(!AIContextBuilder.json(empty).contains("previewPNG"))
+    }
+
+    /// One ordinary send: capture, then the prompt JSON the panel actually posts. Counts `pngBase64` only.
+    @Test func ordinarySendPNGEncodeCount() async throws {
+        let session = EditorSession()
+        session.createDocument(width: 120, height: 80, emptyLayer: true)
+        session.document?.selection = DocumentSelection(path: CGPath(rect: CGRect(x: 10, y: 20, width: 30, height: 40), transform: nil))
+        AIImageEncoder.pngBase64Calls = 0
+        let context = await AIContextBuilder.capture(session)
+        _ = AIContextBuilder.promptJSON(context)
+        let withSelection = AIImageEncoder.pngBase64Calls
+        #expect(context.compositePicture?.didEncodePNG == false)
+        #expect(context.selection?.previewPicture?.didEncodePNG == false)
+
+        let plain = EditorSession()
+        plain.createDocument(width: 40, height: 30, emptyLayer: true)
+        AIImageEncoder.pngBase64Calls = 0
+        let open = await AIContextBuilder.capture(plain)
+        _ = AIContextBuilder.promptJSON(open)
+        let withoutSelection = AIImageEncoder.pngBase64Calls
+        #expect(open.compositePicture?.didEncodePNG == false)
+        #expect(withSelection == 0)
+        #expect(withoutSelection == 0)
     }
 
     @Test func cropRectUsesTheImageLowerLeft() {

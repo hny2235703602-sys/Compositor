@@ -8,7 +8,7 @@ enum CanvasRuler {
 struct CanvasRulerCorner: View {
     var body: some View {
         Rectangle()
-            .fill(Color(white: 0.2))
+            .fill(Color(white: InterfaceTheme.chrome(named: UserDefaults.standard.string(forKey: "interfaceChrome")).ruler))
             .overlay(alignment: .bottomTrailing) {
                 Path { path in
                     path.move(to: CGPoint(x: 5, y: CanvasRuler.thickness - 4))
@@ -56,7 +56,8 @@ final class CanvasRulerNSView: NSView {
     override var isOpaque: Bool { true }
 
     override func draw(_ dirtyRect: NSRect) {
-        NSColor(white: 0.2, alpha: 1).setFill()
+        let chrome = InterfaceTheme.chrome(named: UserDefaults.standard.string(forKey: "interfaceChrome"))
+        NSColor(white: chrome.ruler, alpha: 1).setFill()
         bounds.fill()
         guard let document = session.document else { return }
         let size = document.size
@@ -64,8 +65,8 @@ final class CanvasRulerNSView: NSView {
         let step = Self.majorStep(pointsPerPixel: scale)
         let minor = step / 10
         let hairline = 1 / max(window?.backingScaleFactor ?? 1, 1)
-        let tick = NSColor(white: 0.62, alpha: 1)
-        let labels = NSColor(white: 0.78, alpha: 1)
+        let tick = NSColor(white: chrome.ink, alpha: 1)
+        let labels = NSColor(white: chrome.ink, alpha: 1)
         let attributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedDigitSystemFont(ofSize: 8, weight: .regular),
             .foregroundColor: labels

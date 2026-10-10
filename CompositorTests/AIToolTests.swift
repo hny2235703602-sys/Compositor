@@ -39,7 +39,7 @@ struct AIToolTests {
         #expect(names.count == commands.count + added.count)
         #expect(names.allSatisfy { $0.allSatisfy { $0.isLetter || $0.isNumber || $0 == "_" } })
         let reply = await AIToolRegistry.perform(AIToolCall(id: "2", name: "tool_brush", arguments: "{}"), on: session)
-        #expect(reply.text.contains("Ran"))
+        #expect(reply.text == String(format: String(localized: "Ran %@. The document was unchanged."), "Tool › Brush"))
         #expect(!reply.changedDocument)
         #expect(session.tool == .brush)
         #expect(session.brushMode == .paint)
@@ -84,13 +84,45 @@ struct AIToolTests {
         #expect(session.history.undoCount == steps)
     }
 
+    @Test func cameraRawWithoutAnActiveLayerDoesNotStart() async throws {
+        let session = try makeSession()
+        session.activeLayerID = nil
+        let steps = session.history.undoCount
+        let reply = await AIToolRegistry.perform(AIToolCall(id: "r", name: "use_camera_raw", arguments: #"{"exposure":0.4}"#), on: session)
+        #expect(reply.changedDocument == false)
+        #expect(session.filterEdit == nil)
+        #expect(session.history.undoCount == steps)
+    }
+
+    @Test func cameraRawRefusesWhileAnotherFilterIsOpen() async throws {
+        let session = try graySession()
+        session.beginFilter(.gaussianBlur)
+        let open = try #require(session.filterEdit)
+        #expect(open.kind == .gaussianBlur)
+        let steps = session.history.undoCount
+        let reply = await AIToolRegistry.perform(AIToolCall(id: "r", name: "use_camera_raw", arguments: #"{"exposure":0.4}"#), on: session)
+        #expect(reply.changedDocument == false)
+        #expect(session.filterEdit?.kind == .gaussianBlur)
+        #expect(session.history.undoCount == steps)
+    }
+
+    @Test func cameraRawExposureIsOneUndo() async throws {
+        let session = try graySession()
+        let steps = session.history.undoCount
+        let reply = await AIToolRegistry.perform(AIToolCall(id: "r", name: "use_camera_raw", arguments: #"{"exposure":0.4}"#), on: session)
+        #expect(!reply.text.isEmpty)
+        #expect(reply.changedDocument)
+        #expect(session.filterEdit == nil)
+        #expect(session.history.undoCount == steps + 1)
+    }
+
     @Test func unknownCommandsDoNotTouchTheDocument() async throws {
         let session = try makeSession()
         let steps = session.history.undoCount
         let opacity = try #require(session.activeLayer?.opacity)
         for name in ["shell", "swift", "eval", "setOpacity"] {
             let reply = await AIToolRegistry.perform(AIToolCall(id: name, name: name, arguments: #"{"percent":60}"#), on: session)
-            #expect(reply.text.contains("Unknown"))
+            #expect(reply.text == String(format: String(localized: "Unknown tool %@. Only listed commands can run, and the document was not changed."), name))
             #expect(!reply.changedDocument)
         }
         #expect(session.activeLayer?.opacity == opacity)
@@ -101,7 +133,7 @@ struct AIToolTests {
     @Test func opacityOutsideTheRangeIsRefused() async throws {
         let session = try makeSession()
         let reply = await AIToolRegistry.perform(AIToolCall(id: "1", name: "set_layer_opacity", arguments: #"{"percent":160}"#), on: session)
-        #expect(reply.text.contains("not changed"))
+        #expect(reply.text == String(localized: "set_layer_opacity needs percent from 0 to 100. The document was not changed."))
         #expect(session.activeLayer?.opacity == 1)
         #expect(AIToolRegistry.opacityValue(from: 60) == 0.6)
         #expect(AIToolRegistry.opacityValue(from: 0.6) == 0.6)
@@ -230,7 +262,7 @@ struct AIToolTests {
         #expect(session.document?.layers.contains { $0.adjustment != nil } == false)
 
         let refused = await AIToolRegistry.perform(AIToolCall(id: "n", name: "use_curves", arguments: #"{"points":[{"x":1,"y":1}]}"#), on: session)
-        #expect(refused.text.contains("not changed"))
+        #expect(refused.text == String(localized: "use_curves needs an RGB curve that is not a straight line. The document was not changed."))
         #expect(session.history.undoCount == steps)
 
         let curved = await AIToolRegistry.perform(AIToolCall(id: "c", name: "use_curves", arguments: #"{"points":[{"x":0,"y":0},{"x":0.3,"y":0.08},{"x":1,"y":1}]}"#), on: session)
@@ -276,22 +308,116 @@ struct AIToolTests {
 
     @Test func saveAndLoadKeepFormatVersionEleven() async throws {
         let session = try graySession()
-        let url = URL(fileURLWithPath: NSHomeDirectory()).appending(path: "Library/Caches/compositor-ai-tool-test.comp")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("compositor-ai-tool-test-\(UUID().uuidString).comp")
         defer { try? FileManager.default.removeItem(at: url) }
         let saved = await AIToolRegistry.perform(AIToolCall(id: "s", name: "save_project", arguments: #"{"path":"\#(url.path)"}"#), on: session)
-        #expect(saved.text.contains("format version \(ProjectManifest.current)"))
+        #expect(saved.text == String(format: String(localized: "Saved %@, format version %lld."), url.lastPathComponent, Int64(ProjectManifest.current)))
         #expect(ProjectManifest.current == 11)
         let snapshot = try await ProjectStore.shared.load(from: url)
         #expect(snapshot.manifest.version == 11)
         #expect(snapshot.manifest.width == 8 && snapshot.manifest.height == 8)
         let opened = EditorSession()
-        let loaded = await AIToolRegistry.perform(AIToolCall(id: "l", name: "load_project", arguments: #"{"path":"\#(url.path)"}"#), on: opened)
+        let loaded = await AIToolRegistry.perform(AIToolCall(id: "l", name: "load_project", arguments: #"{"path":"\#(url.path)"}"#), on: opened, controller: ProjectController(session: opened))
         #expect(loaded.wantsPreview)
         #expect(opened.document?.width == 8 && opened.document?.height == 8)
-        #expect(opened.projectURL?.lastPathComponent == url.lastPathComponent)
-        #expect(opened.projectURL?.path.hasPrefix(NSHomeDirectory() + "/") == true)
+        #expect(opened.projectURL?.standardizedFileURL.path == url.standardizedFileURL.path)
         let outside = await AIToolRegistry.perform(AIToolCall(id: "x", name: "save_project", arguments: #"{"path":"/tmp/nope.comp"}"#), on: session)
-        #expect(outside.text.contains("home directory"))
+        #expect(outside.text == String(localized: "save_project needs the open project, or a .comp path under the home directory. Nothing was written."))
+    }
+
+    @Test func loadProjectCancelLeavesTheUnsavedDocument() async throws {
+        let session = try makeSession()
+        let original = FileManager.default.temporaryDirectory.appendingPathComponent("compositor-ai-load-original-\(UUID().uuidString).comp")
+        session.projectURL = original
+        let documentID = try #require(session.document).id
+        session.setLayerOpacity(0.4)
+        let undo = session.history.undoCount
+        #expect(session.isModified && undo > 0)
+        let incoming = try toneSession(level: 20)
+        let url = try await writeProject(incoming, name: "compositor-ai-load-cancel.comp")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let controller = ProjectController(session: session)
+        controller.unsavedChangesReply = { .alertSecondButtonReturn }
+        let outcome = await AIToolRegistry.perform(AIToolCall(id: "l", name: "load_project", arguments: #"{"path":"\#(url.path)"}"#), on: session, controller: controller)
+        #expect(outcome.changedDocument == false)
+        #expect(outcome.listInSession == false)
+        #expect(outcome.text == String(localized: "Opening was cancelled. The document was not changed."))
+        #expect(!outcome.text.contains("Undo was cleared"))
+        #expect(session.document?.id == documentID)
+        #expect(session.projectURL == original)
+        #expect(session.history.undoCount == undo)
+        #expect(session.activeLayer?.opacity == 0.4)
+    }
+
+    @Test func loadProjectDontSaveReplacesTheDocument() async throws {
+        let session = try makeSession()
+        session.setLayerOpacity(0.4)
+        let incoming = try toneSession(level: 20)
+        let url = try await writeProject(incoming, name: "compositor-ai-load-replace.comp")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let controller = ProjectController(session: session)
+        controller.unsavedChangesReply = { .alertThirdButtonReturn }
+        let outcome = await AIToolRegistry.perform(AIToolCall(id: "l", name: "load_project", arguments: #"{"path":"\#(url.path)"}"#), on: session, controller: controller)
+        #expect(outcome.changedDocument == false)
+        #expect(outcome.listInSession)
+        #expect(outcome.text == String(format: String(localized: "Opened %@, format version %lld. Undo was cleared."), url.lastPathComponent, Int64(ProjectManifest.current)))
+        #expect(session.document?.width == 8 && session.document?.height == 8)
+        #expect(session.projectURL?.standardizedFileURL.path == url.standardizedFileURL.path)
+        #expect(session.history.undoCount == 0)
+    }
+
+    @Test func loadProjectReadFailureLeavesTheDocumentByteForByte() async throws {
+        let session = try toneSession(level: 180)
+        let live = FileManager.default.temporaryDirectory.appendingPathComponent("compositor-ai-load-live-\(UUID().uuidString).comp")
+        session.projectURL = live
+        session.setLayerOpacity(0.7)
+        let documentID = try #require(session.document).id
+        let undo = session.history.undoCount
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("compositor-ai-load-corrupt-\(UUID().uuidString).comp")
+        try? FileManager.default.removeItem(at: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+        try Data("not a project".utf8).write(to: url)
+        let before = try await brightest(session)
+        let controller = ProjectController(session: session)
+        controller.unsavedChangesReply = { .alertThirdButtonReturn }
+        let outcome = await AIToolRegistry.perform(AIToolCall(id: "l", name: "load_project", arguments: #"{"path":"\#(url.path)"}"#), on: session, controller: controller)
+        #expect(outcome.changedDocument == false)
+        #expect(outcome.text == String(format: String(localized: "Could not open %@ (%@). The document was not changed."), url.lastPathComponent, "This is not a valid Compositor project, or its metadata is damaged."))
+        #expect(!outcome.text.contains("Undo was cleared"))
+        #expect(session.document?.id == documentID)
+        #expect(session.projectURL == live)
+        #expect(session.history.undoCount == undo)
+        #expect(session.activeLayer?.opacity == 0.7)
+        #expect(try await brightest(session) == before)
+    }
+
+    @Test func loadProjectWithoutTheControllerRefusesInsteadOfCrashing() async throws {
+        let session = try makeSession()
+        let url = try await writeProject(session, name: "compositor-ai-load-no-controller.comp")
+        defer { try? FileManager.default.removeItem(at: url) }
+        session.projectURL = url
+        let documentID = try #require(session.document).id
+        let layerCount = try #require(session.document).layers.count
+        let undo = session.history.undoCount
+        let reply = await AIToolRegistry.perform(AIToolCall(id: "l", name: "load_project", arguments: #"{"path":"\#(url.path)"}"#), on: session)
+        #expect(reply.text == "load_project needs the project window. The document was not changed.")
+        #expect(reply.changedDocument == false && reply.wantsPreview == false && reply.listInSession == false)
+        #expect(session.document?.id == documentID)
+        #expect(session.document?.layers.count == layerCount)
+        #expect(session.history.undoCount == undo)
+        #expect(FileManager.default.fileExists(atPath: url.path))
+    }
+
+    /// save 的 controller 调用全是可选链，load 的却是硬 guard。两者不一致是当前事实，不是设计决定；将来若要统一，这个测试会红，届时是有意改动而不是误改。
+    @Test func saveProjectWithoutTheControllerStillWrites() async throws {
+        let session = try makeSession()
+        session.projectURL = nil
+        let dest = FileManager.default.temporaryDirectory.appendingPathComponent("compositor-ai-save-no-controller-\(UUID().uuidString).comp")
+        defer { try? FileManager.default.removeItem(at: dest) }
+        let reply = await AIToolRegistry.perform(AIToolCall(id: "s", name: "save_project", arguments: #"{"path":"\#(dest.path)"}"#), on: session)
+        #expect(reply.text.hasPrefix("Saved "))
+        #expect(FileManager.default.fileExists(atPath: dest.appendingPathComponent("manifest.json").path))
+        _ = try await ProjectStore.shared.load(from: dest)
     }
 
     @Test func coolerRequestRendersAndContinuesUntilTheModelStops() async throws {
@@ -328,10 +454,43 @@ struct AIToolTests {
         let model = AIPanelModel()
         await model.run(question: "cool it", session: session, provider: FailingProvider())
         #expect(model.error?.contains("offline") == true)
+        #expect(model.messages.contains { $0.role == .error && $0.text.contains("offline") })
         #expect(model.changes.isEmpty)
         let reply = await AIToolRegistry.perform(AIToolCall(id: "1", name: "set_layer_opacity", arguments: #"{"percent":60}"#), on: session)
         #expect(reply.changedDocument)
         #expect(session.activeLayer?.opacity == 0.6)
+    }
+
+    /// A model that never stops calling tools hits the round limit. That notice is not replayed as the model's own words.
+    @Test func roundLimitNoticeIsNotReplayedAsTheAssistant() async throws {
+        let session = try graySession()
+        let model = AIPanelModel()
+        model.draft = "keep adjusting"
+        model.send(session: session, endpoint: "https://example.invalid", modelName: "test", provider: LoopingToolProvider())
+        await waitUntilIdle(model)
+        #expect(model.isSending == false)
+        let notice = String(format: String(localized: "Stopped after %lld rounds."), Int64(AIPanelModel.roundLimit))
+        let last = try #require(model.messages.last)
+        #expect(last.role == .error)
+        #expect(last.role != .assistant)
+        #expect(last.text == notice)
+
+        let recorder = RecordingProvider()
+        model.draft = "what is the zoom?"
+        model.send(session: session, endpoint: "https://example.invalid", modelName: "test", provider: recorder)
+        await waitUntilIdle(model)
+        #expect(model.isSending == false)
+        #expect(recorder.texts.contains(notice) == false)
+    }
+
+    @Test func aFailedRequestStaysInTheConversation() async throws {
+        let session = try makeSession()
+        let model = AIPanelModel()
+        await model.run(question: "cool it", session: session, provider: FailingProvider())
+        #expect(model.error?.contains("offline") == true)
+        #expect(model.messages.contains { $0.role == .error && $0.text.contains("offline") })
+        await model.run(question: "调成冷色调", session: session, provider: ScriptedGrade())
+        #expect(model.messages.contains { $0.role == .error && $0.text.contains("offline") })
     }
 
     @Test func aBadEndpointStaysInTheCheck() async {
@@ -391,10 +550,85 @@ struct AIToolTests {
         #expect((225...235).contains(after))
     }
 
+    @Test func aCancelledSendDoesNotClearTheNextOne() async throws {
+        let session = try makeSession()
+        let model = AIPanelModel()
+        let first = PauseProvider(pause: .seconds(30), reply: "first")
+        model.draft = "one"
+        model.send(session: session, endpoint: "http://127.0.0.1", modelName: "test", provider: first)
+        let started = Date()
+        while !first.didStart(), Date().timeIntervalSince(started) < 3 {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(first.didStart())
+        #expect(model.isSending)
+        model.cancel()
+        #expect(model.status == String(localized: "Stopped."))
+        #expect(model.error == nil)
+        #expect(!model.isSending)
+        let second = PauseProvider(pause: .milliseconds(200), reply: "second-done")
+        model.draft = "two"
+        model.send(session: session, endpoint: "http://127.0.0.1", modelName: "test", provider: second)
+        #expect(model.isSending)
+        let waiting = Date()
+        while !second.didStart(), Date().timeIntervalSince(waiting) < 3 {
+            #expect(model.isSending)
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(second.didStart())
+        #expect(model.isSending)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(model.isSending)
+        let deadline = Date().addingTimeInterval(3)
+        while model.isSending, Date() < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(!model.isSending)
+        #expect(model.error == nil)
+        #expect(model.messages.contains { $0.text == "second-done" })
+    }
+
+    @Test func cancellingOnePanelLeavesTheOtherRunning() async throws {
+        let session = try makeSession()
+        let stopped = AIPanelModel()
+        let kept = AIPanelModel()
+        let hanging = PauseProvider(pause: .seconds(30), reply: "should-not-finish")
+        let finishing = PauseProvider(pause: .milliseconds(150), reply: "from-b")
+        stopped.draft = "stop me"
+        kept.draft = "keep me"
+        stopped.send(session: session, endpoint: "http://127.0.0.1", modelName: "test", provider: hanging)
+        kept.send(session: session, endpoint: "http://127.0.0.1", modelName: "test", provider: finishing)
+        let started = Date()
+        while (!hanging.didStart() || !finishing.didStart()), Date().timeIntervalSince(started) < 3 {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(hanging.didStart() && finishing.didStart())
+        stopped.cancel()
+        #expect(stopped.status == String(localized: "Stopped."))
+        #expect(stopped.error == nil)
+        #expect(kept.isSending)
+        let deadline = Date().addingTimeInterval(3)
+        while kept.isSending, Date() < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(!kept.isSending)
+        #expect(kept.error == nil)
+        #expect(kept.status == String(localized: "Finished."))
+        #expect(kept.messages.contains { $0.text == "from-b" })
+        #expect(!stopped.messages.contains { $0.text == "should-not-finish" })
+    }
+
     @Test func aDeadHelperDoesNotEscape() async {
         let launch = await AIPanelProcess.launch(executable: URL(fileURLWithPath: "/usr/bin/false"), request: Data(), timeout: 5)
         #expect(launch.output == nil)
         #expect(launch.fault?.contains("not affected") == true)
+    }
+
+    private func writeProject(_ session: EditorSession, name: String) async throws -> URL {
+        let stem = (name as NSString).deletingPathExtension
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(stem)-\(UUID().uuidString).comp")
+        try await ProjectStore.shared.save(try #require(session.projectSnapshot()), to: url)
+        return url
     }
 
     private func makeSession() throws -> EditorSession {
@@ -473,6 +707,71 @@ private final class ScriptedTool: AIProvider, @unchecked Sendable {
             return AICompletion(text: nil, toolCalls: [AIToolCall(id: "1", name: name, arguments: "{}")])
         }
         return AICompletion(text: "Done.", toolCalls: [])
+    }
+}
+
+/// Holds the first model call, then answers. Used to overlap a cancelled request with the next one.
+private final class PauseProvider: AIProvider, @unchecked Sendable {
+    private let lock = NSLock()
+    private var calls = 0
+    private var started = false
+    private let pause: Duration
+    private let reply: String
+    init(pause: Duration, reply: String) {
+        self.pause = pause
+        self.reply = reply
+    }
+    func didStart() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return started
+    }
+    func complete(_ turns: [AITurn], tools: [AIToolSpec]) async throws -> AICompletion {
+        let call: Int
+        lock.lock()
+        call = calls
+        calls += 1
+        started = true
+        lock.unlock()
+        if call == 0 { try await Task.sleep(for: pause) }
+        if tools.isEmpty { return AICompletion(text: "plan", toolCalls: []) }
+        return AICompletion(text: reply, toolCalls: [])
+    }
+}
+
+private func waitUntilIdle(_ model: AIPanelModel) async {
+    for _ in 0..<400 where model.isSending {
+        try? await Task.sleep(for: .milliseconds(25))
+    }
+}
+
+/// Returns a tool call on every completion, so the panel stops at the round limit.
+private final class LoopingToolProvider: AIProvider, @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+    func complete(_ turns: [AITurn], tools: [AIToolSpec]) async throws -> AICompletion {
+        lock.lock()
+        count += 1
+        let id = "loop-\(count)"
+        lock.unlock()
+        return AICompletion(text: nil, toolCalls: [AIToolCall(id: id, name: "shell", arguments: "{}")])
+    }
+}
+
+/// Remembers every turn it is shown, then answers without calling a tool.
+private final class RecordingProvider: AIProvider, @unchecked Sendable {
+    private let lock = NSLock()
+    private var seen: [String] = []
+    var texts: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return seen
+    }
+    func complete(_ turns: [AITurn], tools: [AIToolSpec]) async throws -> AICompletion {
+        lock.lock()
+        seen.append(contentsOf: turns.map(\.text))
+        lock.unlock()
+        return AICompletion(text: "Zoom is in the sample.", toolCalls: [])
     }
 }
 

@@ -16,10 +16,28 @@ struct AIContext: Equatable {
     var selectedLayerIDs: [String]
     /// Every layer, bottom to top.
     var layers: [LayerNode]
-    var compositePNG: String?
+    /// The rendered canvas. Reading `compositePNG` encodes it; a send's prompt never does.
+    var compositePicture: CanvasPicture?
+    /// `.none` encodes from `compositePicture`. `.some` is an explicit string, including null.
+    private var compositePNGOverride: String?? = nil
+    var compositePNG: String? {
+        get {
+            if let compositePNGOverride { return compositePNGOverride }
+            return compositePicture?.png()
+        }
+        set { compositePNGOverride = .some(newValue) }
+    }
     var compositeError: String?
     /// Small JPEG for the model. Kept out of the JSON so the prompt does not carry the picture twice.
     var modelJPEG: Data? = nil
+
+    static func == (lhs: AIContext, rhs: AIContext) -> Bool {
+        lhs.document == rhs.document && lhs.viewport == rhs.viewport && lhs.activeTool == rhs.activeTool
+            && lhs.toolMode == rhs.toolMode && lhs.selection == rhs.selection && lhs.activeLayer == rhs.activeLayer
+            && lhs.selectedLayerIDs == rhs.selectedLayerIDs && lhs.layers == rhs.layers
+            && lhs.compositePicture == rhs.compositePicture && lhs.compositePNGOverride == rhs.compositePNGOverride
+            && lhs.compositeError == rhs.compositeError && lhs.modelJPEG == rhs.modelJPEG
+    }
 
     struct Document: Equatable {
         var width: Int
@@ -35,7 +53,22 @@ struct AIContext: Equatable {
     struct Selection: Equatable {
         var bounds: Bounds?
         var hasMask: Bool
-        var previewPNG: String?
+        /// Crop of the selection. Reading `previewPNG` encodes it; a send's prompt never does.
+        var previewPicture: CanvasPicture?
+        /// `.none` encodes from `previewPicture`. `.some` is an explicit string, including null.
+        private var previewPNGOverride: String?? = nil
+        var previewPNG: String? {
+            get {
+                if let previewPNGOverride { return previewPNGOverride }
+                return previewPicture?.png()
+            }
+            set { previewPNGOverride = .some(newValue) }
+        }
+
+        static func == (lhs: Selection, rhs: Selection) -> Bool {
+            lhs.bounds == rhs.bounds && lhs.hasMask == rhs.hasMask && lhs.previewPicture == rhs.previewPicture
+                && lhs.previewPNGOverride == rhs.previewPNGOverride
+        }
     }
     struct Bounds: Equatable {
         var x, y, width, height: Double
@@ -75,23 +108,28 @@ enum AIContextBuilder {
             activeLayer: session.activeLayer.map(layerSummary),
             selectedLayerIDs: selectedIDs(in: session),
             layers: document.map(layerTree) ?? [],
-            compositePNG: nil,
             compositeError: nil)
         if let selection = session.selection {
-            context.selection = AIContext.Selection(bounds: bounds(of: selection), hasMask: !selection.isEmpty, previewPNG: nil)
+            context.selection = AIContext.Selection(bounds: bounds(of: selection), hasMask: !selection.isEmpty)
         }
         guard let snapshot = session.projectSnapshot() else { return context }
         let selectionBox = context.selection?.bounds.map { CGRect(x: $0.x, y: $0.y, width: $0.width, height: $0.height) }
         do {
             let raster = try await ImageExporter.shared.render(snapshot)
-            // The full canvas can be enormous. Scale it off the main actor, then come back with the strings and a small JPEG.
+            // Hold the rendered image. PNG strings are encoded only when something reads them. The prompt
+            // clears those strings, so a send pays for the JPEG the model actually sees and not for the PNGs.
             let encoded = await Task.detached {
-                let pictures = AIImageEncoder.encode(raster.image, selection: selectionBox)
                 let jpeg = AIImageEncoder.jpeg(raster.image, longSide: AIImageEncoder.compositeLongSide)
-                return (pictures.composite, pictures.selection, jpeg)
+                let preview: CGImage? = selectionBox.flatMap { box in
+                    guard let rect = AIImageEncoder.cropRect(documentBounds: box, imageWidth: raster.image.width, imageHeight: raster.image.height) else { return nil }
+                    return raster.image.cropping(to: rect)
+                }
+                return (raster.image, preview, jpeg)
             }.value
-            context.compositePNG = encoded.0
-            context.selection?.previewPNG = encoded.1
+            context.compositePicture = CanvasPicture(image: encoded.0, longSide: AIImageEncoder.compositeLongSide)
+            if let preview = encoded.1 {
+                context.selection?.previewPicture = CanvasPicture(image: preview, longSide: AIImageEncoder.selectionLongSide)
+            }
             context.modelJPEG = encoded.2
         } catch {
             context.compositeError = error.localizedDescription
@@ -250,6 +288,26 @@ extension AIContext {
     }
 }
 
+/// A rendered image whose PNG is produced on read, once.
+final class CanvasPicture: Equatable, @unchecked Sendable {
+    let image: CGImage
+    let longSide: CGFloat
+    private var cached: String?
+    private var encoded = false
+    init(image: CGImage, longSide: CGFloat) {
+        self.image = image
+        self.longSide = longSide
+    }
+    var didEncodePNG: Bool { encoded }
+    func png() -> String? {
+        if encoded { return cached }
+        encoded = true
+        cached = AIImageEncoder.pngBase64(image, longSide: longSide)
+        return cached
+    }
+    static func == (lhs: CanvasPicture, rhs: CanvasPicture) -> Bool { lhs === rhs }
+}
+
 /// PNGs for the prompt. The composite's long side stays at or under 1,024; a selection crop stays at or under 768.
 nonisolated enum AIImageEncoder {
     static let compositeLongSide: CGFloat = 1024
@@ -271,7 +329,11 @@ nonisolated enum AIImageEncoder {
         return CGRect(x: bounds.minX, y: CGFloat(imageHeight) - bounds.maxY, width: bounds.width, height: bounds.height)
     }
 
+    /// Test instrumentation. A send used to encode PNGs that the prompt then threw away.
+    nonisolated(unsafe) static var pngBase64Calls = 0
+
     static func pngBase64(_ image: CGImage, longSide: CGFloat) -> String? {
+        pngBase64Calls += 1
         guard let scaled = scale(image, longSide: longSide), let data = pngData(scaled) else { return nil }
         return data.base64EncodedString()
     }

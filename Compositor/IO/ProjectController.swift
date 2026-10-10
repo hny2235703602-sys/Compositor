@@ -8,6 +8,8 @@ final class ProjectController {
     weak var window: NSWindow?
     weak var workspace: ProjectWorkspace?
     private var saveGeneration = 0
+    /// Answers the unsaved-changes alert in tests. Production leaves it unset and shows the alert.
+    var unsavedChangesReply: (() async -> NSApplication.ModalResponse)?
     /// Keeps the document in step with its package when something else writes it. See ProjectController+ExternalChanges.
     let externalChanges = ExternalChangeState()
     var canStart: Bool {
@@ -276,24 +278,60 @@ final class ProjectController {
         let scoped = source.startAccessingSecurityScopedResource()
         defer { if scoped { source.stopAccessingSecurityScopedResource() } }
         do {
-            // Validate first. A corrupt project never discards the live document.
-            var snapshot = try await ProjectStore.shared.load(from: source)
-            let previousSave = saveGeneration
-            guard await confirmReplacement() else { return false }
-            // Saving in the confirmation can replace the very file being opened.
-            if saveGeneration != previousSave,
-               session.projectURL?.resolvingSymlinksInPath() == source.resolvingSymlinksInPath() {
-                snapshot = try await ProjectStore.shared.load(from: source)
-            }
-            session.installProject(snapshot, from: source)
-            RecentProjects.shared.note(source)
-            await rememberProjectDigest(for: source)
-            watchProject(at: source)
+            guard let snapshot = try await validatedSnapshot(from: source) else { return false }
+            await adopt(snapshot, from: source)
             return true
         } catch {
             await showError("Couldn’t open the project", error: error)
             return false
         }
+    }
+
+    /// The assistant's open: the same order as `open`, including the unsaved-changes question.
+    /// Cancel and a failed read both leave the live document alone.
+    @discardableResult
+    func loadForAssistant(_ url: URL) async -> AIToolOutcome {
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            return .unchanged(String(format: String(localized: "Could not open %@. The file is missing. The document was not changed."), url.lastPathComponent))
+        }
+        guard begin() else {
+            return .unchanged(String(localized: "A project operation is already running. The document was not changed."))
+        }
+        defer { session.isProjectBusy = false }
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        do {
+            guard let snapshot = try await validatedSnapshot(from: url) else {
+                return .unchanged(String(localized: "Opening was cancelled. The document was not changed."))
+            }
+            await adopt(snapshot, from: url)
+            return AIToolOutcome(text: String(format: String(localized: "Opened %@, format version %lld. Undo was cleared."), url.lastPathComponent, Int64(snapshot.manifest.version)),
+                                 changedDocument: false, wantsPreview: true, listInSession: true)
+        } catch {
+            return .unchanged(String(format: String(localized: "Could not open %@ (%@). The document was not changed."), url.lastPathComponent, error.localizedDescription))
+        }
+    }
+
+    /// Load and, when the open document has unsaved edits, ask before it is replaced.
+    /// Nil means the user cancelled. A throw means the file was not a readable project, and nothing was installed.
+    private func validatedSnapshot(from source: URL) async throws -> ProjectSnapshot? {
+        // Validate first. A corrupt project never discards the live document.
+        var snapshot = try await ProjectStore.shared.load(from: source)
+        let previousSave = saveGeneration
+        guard await confirmReplacement() else { return nil }
+        // Saving in the confirmation can replace the very file being opened.
+        if saveGeneration != previousSave,
+           session.projectURL?.resolvingSymlinksInPath() == source.resolvingSymlinksInPath() {
+            snapshot = try await ProjectStore.shared.load(from: source)
+        }
+        return snapshot
+    }
+
+    private func adopt(_ snapshot: ProjectSnapshot, from source: URL) async {
+        session.installProject(snapshot, from: source)
+        RecentProjects.shared.note(source)
+        await rememberProjectDigest(for: source)
+        watchProject(at: source)
     }
 
     func newCanvas() async {
@@ -328,13 +366,18 @@ final class ProjectController {
         // A save still writing finishes before the project can be closed or replaced, so its file is never cut short.
         await finishWriting()
         guard session.isModified, session.document != nil else { return true }
-        let alert = NSAlert()
-        alert.messageText = "Save changes to \(session.projectURL?.lastPathComponent ?? "Untitled")?"
-        alert.informativeText = "Your changes will be lost if you don’t save them."
-        alert.addButton(withTitle: "Save")
-        alert.addButton(withTitle: "Cancel")
-        alert.addButton(withTitle: "Don’t Save")
-        let response = await show(alert)
+        let response: NSApplication.ModalResponse
+        if let unsavedChangesReply {
+            response = await unsavedChangesReply()
+        } else {
+            let alert = NSAlert()
+            alert.messageText = "Save changes to \(session.projectURL?.lastPathComponent ?? "Untitled")?"
+            alert.informativeText = "Your changes will be lost if you don’t save them."
+            alert.addButton(withTitle: "Save")
+            alert.addButton(withTitle: "Cancel")
+            alert.addButton(withTitle: "Don’t Save")
+            response = await show(alert)
+        }
         if response == .alertFirstButtonReturn { return await saveCurrent() }
         return response == .alertThirdButtonReturn
     }
