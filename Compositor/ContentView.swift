@@ -4,8 +4,9 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     /// The Layers panel's width, remembered across launches.
     @AppStorage("layersPanelWidth") private var layersPanelWidth = 252.0
-    /// The AI panel's width, remembered across launches.
+    /// The AI panel's width, remembered across launches. The panel itself stays closed until it is opened.
     @AppStorage("aiPanelWidth") private var aiPanelWidth = 320.0
+    @AppStorage("aiPanelShown") private var aiPanelShown = false
     @Bindable var session: EditorSession
     var applicationDelegate: CompositorApplicationDelegate? = nil
     @Environment(\.openWindow) private var openWindow
@@ -115,8 +116,15 @@ struct ContentView: View {
                 if !session.canvasOnly {
                     PanelResizeEdge(width: $layersPanelWidth, range: LayersPanel.widths)
                     LayersPanel(session: session, width: layersPanelWidth)
-                    PanelResizeEdge(width: $aiPanelWidth, range: AIPanelView.widths)
-                    AIPanelView(session: session, width: aiPanelWidth, controller: applicationDelegate?.projects)
+                    if aiPanelShown {
+                        PanelResizeEdge(width: $aiPanelWidth, range: AIPanelView.widths)
+                    }
+                    AIPanelView(session: session, width: aiPanelWidth, controller: applicationDelegate?.projects,
+                                onClose: { aiPanelShown = false })
+                        .frame(width: aiPanelShown ? aiPanelWidth : 0, alignment: .trailing)
+                        .clipped()
+                        .allowsHitTesting(aiPanelShown)
+                        .accessibilityHidden(!aiPanelShown)
                 }
             }
             if !session.canvasOnly {
@@ -192,6 +200,13 @@ struct ContentView: View {
             // Absorb all remaining navigation-toolbar width before the zoom controls.
             // Without this spacer, the growing tab strip pushes the primary actions left.
             ToolbarSpacer(.flexible, placement: .navigation)
+            ToolbarItem(placement: .primaryAction) {
+                Button { aiPanelShown.toggle() } label: {
+                    Label("Assistant", systemImage: "sparkles")
+                }
+                .help(aiPanelShown ? "Hide Assistant" : "Show Assistant")
+                .accessibilityIdentifier("toggleAssistant")
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button("Fit") { session.fit() }.help("Fit canvas in window (⌘0)")
                     .accessibilityIdentifier("fitCanvas").disabled(session.document == nil)

@@ -5,6 +5,8 @@ struct AIPanelView: View {
     var width: CGFloat = 320
     /// Saves and opens go through the window's controller so a write is not reloaded as someone else's change.
     var controller: ProjectController? = nil
+    /// Collapses the drawer. The view stays mounted so the conversation is still there when it opens again.
+    var onClose: () -> Void = {}
     static let widths: ClosedRange<Double> = 260...480
 
     @AppStorage("aiEndpoint") private var endpoint = "https://api.openai.com/v1"
@@ -61,6 +63,12 @@ struct AIPanelView: View {
                 Button("Stop", action: model.cancel).controlSize(.small)
                 ProgressView().controlSize(.small)
             }
+            Button(action: onClose) {
+                Image(systemName: "sidebar.trailing")
+            }
+            .buttonStyle(.borderless)
+            .help("Hide Assistant")
+            .accessibilityIdentifier("hideAssistant")
         }
         .padding(18)
     }

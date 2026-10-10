@@ -391,6 +391,26 @@
         }
       }
     },
+    "Hide Assistant": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "收起助手"
+          }
+        }
+      }
+    },
+    "Show Assistant": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示助手"
+          }
+        }
+      }
+    },
     "Atkinson (Classic Mac)": {
       "localizations": {
         "zh-Hans": {
