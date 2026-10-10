@@ -6,6 +6,8 @@ struct EditorCanvas: NSViewRepresentable {
     func makeNSView(context: Context) -> CanvasView { CanvasView(session: session) }
     func updateNSView(_ view: CanvasView, context: Context) {
         view.consumeFocusRequest(session.canvasFocusRequest)
+        _ = session.brushSettings.diameter // observed here so the brush circle tracks Size
+        _ = session.brushSettings.hardness
         _ = session.showsTransformControls // observed here so ⌘H redraws the transform box at once
         _ = session.showsGrid
         _ = session.layoutGrid
@@ -658,6 +660,8 @@ final class CanvasView: NSView {
         // or transform drag, marching-ants tick, or cursor move) makes AppKit redraw the canvas beneath —
         // the whole checkerboard and layer composite. All three get layers so they keep their stacking order.
         for overlay in [lines, transformOverlay, brushCursor, sampleRing] as [NSView] { overlay.wantsLayer = true }
+        // The brush circle has to redraw as the pointer moves, not only when the window resizes.
+        brushCursor.layerContentsRedrawPolicy = .onSetNeedsDisplay
         lines.autoresizingMask = [.width, .height]
         lines.drawLines = { [weak self] dirtyRect in self?.drawLines(in: dirtyRect) }
         clipsToBounds = true
@@ -787,6 +791,7 @@ final class CanvasView: NSView {
                   ["[", "]", "{", "}"].contains(key) else { return originalEvent }
             if key == "[" || key == "]" { self.session.changeBrushSize(increase: key == "]") }
             else { self.session.changeBrushHardness(increase: key == "}") }
+            self.updateBrushCursor()
             return nil
         }
     }
@@ -1442,8 +1447,15 @@ final class CanvasView: NSView {
     private func restoreToolCursor() {
         if session.hueTargeting { NSCursor.resizeLeftRight.set() }
         else if session.tool.isSelectionTool, !spaceHeld { lassoCursor.set() }
-        else if session.tool == .cloneStamp, session.cloneSource != nil, !optionHeld, !spaceHeld { Self.hiddenCursor.set() }
+        else if brushCircleStandsInForCursor { Self.hiddenCursor.set() }
         else { toolCursor.set() }
+    }
+
+    /// Brush, eraser, healing, clone and smear: the radius circle stands in for the pointer.
+    /// Option with Clone Stamp brings the crosshair back, to place the source.
+    private var brushCircleStandsInForCursor: Bool {
+        session.tool.isBrushTool && !spaceHeld && !picking && middlePanPoint == nil
+            && !(session.tool == .cloneStamp && optionHeld)
     }
 
     /// The current tool's cursor over the canvas, with nothing being picked or dragged.
@@ -1467,9 +1479,9 @@ final class CanvasView: NSView {
         }
         if session.hueTargeting { addCursorRect(bounds, cursor: .resizeLeftRight); return }
         if session.tool.isSelectionTool, !spaceHeld { addCursorRect(bounds, cursor: lassoCursor); return }
-        // Clone Stamp with a source: the brush circle, its preview and the source crosshair stand in
-        // for the cursor. Holding Option to pick a new source brings the crosshair back.
-        if session.tool == .cloneStamp, session.cloneSource != nil, !optionHeld, !spaceHeld {
+        // The radius circle (and, for Clone Stamp, its preview and source crosshair) stands in for
+        // the pointer. Holding Option with Clone Stamp to pick a source brings the crosshair back.
+        if brushCircleStandsInForCursor {
             addCursorRect(bounds, cursor: Self.hiddenCursor)
             return
         }
@@ -1501,6 +1513,10 @@ final class CanvasView: NSView {
     }
     private func updateBrushCursor() {
         let shows = session.tool.isBrushTool && !spaceHeld && !picking && middlePanPoint == nil
+        if shows, brushPointer == nil, let window {
+            let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
+            if visibleRect.contains(point) { brushPointer = point }
+        }
         let diameter = session.brushStroke?.settings.diameter ?? session.brushSettings.diameter
         // Clone Stamp also marks where it is copying from and, between strokes, previews inside
         // the circle what a click would stamp there.
@@ -1616,7 +1632,9 @@ final class CanvasView: NSView {
         if [Self.eyedropperCursor, Self.eyedropperAddCursor, Self.eyedropperRemoveCursor].contains(NSCursor.current) { restoreToolCursor() }
         brushPointer = convert(event.locationInWindow, from: nil)
         updateBrushCursor()
-        if session.tool == .move { updateTransformCursor(at: convert(event.locationInWindow, from: nil), flags: event.modifierFlags) }
+        if brushCircleStandsInForCursor { Self.hiddenCursor.set() }
+        else if session.tool.isBrushTool, !spaceHeld, !picking { NSCursor.crosshair.set() }
+        else if session.tool == .move { updateTransformCursor(at: convert(event.locationInWindow, from: nil), flags: event.modifierFlags) }
         else { super.mouseMoved(with: event) }
     }
     override func cursorUpdate(with event: NSEvent) {
@@ -1626,6 +1644,7 @@ final class CanvasView: NSView {
         // Cursor-update events carry no modifier flags (AppKit sends one after every key change), so read
         // the keys as they are now; the event's flags would undo Option's duplicate cursor straight away.
         else if session.tool == .move { updateTransformCursor(at: convert(event.locationInWindow, from: nil), flags: NSEvent.modifierFlags) }
+        else if brushCircleStandsInForCursor { Self.hiddenCursor.set() }
         else { super.cursorUpdate(with: event) }
     }
     private func updateTransformCursor(at point: CGPoint, flags: NSEvent.ModifierFlags = NSEvent.modifierFlags) {
@@ -1926,6 +1945,7 @@ final class CanvasView: NSView {
         }
         brushPointer = point
         updateBrushCursor()
+        if brushCircleStandsInForCursor { Self.hiddenCursor.set() }
         if session.brushStroke != nil || session.warpStroke != nil, !session.isProjectBusy, let document = session.document {
             var pixel = session.viewport.documentPoint(from: point, documentSize: document.size)
             // Shift keeps the stroke straight, horizontal or vertical, from wherever it was pressed; letting go carries
@@ -2242,11 +2262,11 @@ final class CanvasView: NSView {
             case "l": if !event.isARepeat { session.pressLassoKey(); refreshLassoCursor() }
             case let key? where Int(key) != nil && session.usesOpacityKeys:
                 session.typeOpacityDigit(Int(key) ?? 0)
-            case "[" where session.tool.isBrushTool: session.changeBrushSize(increase: false)
-            case "]" where session.tool.isBrushTool: session.changeBrushSize(increase: true)
+            case "[" where session.tool.isBrushTool: session.changeBrushSize(increase: false); updateBrushCursor()
+            case "]" where session.tool.isBrushTool: session.changeBrushSize(increase: true); updateBrushCursor()
             // Shift turns [ and ] into { and }.
-            case "{" where session.tool.isBrushTool: session.changeBrushHardness(increase: false)
-            case "}" where session.tool.isBrushTool: session.changeBrushHardness(increase: true)
+            case "{" where session.tool.isBrushTool: session.changeBrushHardness(increase: false); updateBrushCursor()
+            case "}" where session.tool.isBrushTool: session.changeBrushHardness(increase: true); updateBrushCursor()
             case "a": session.selectTool(.idle)
             case "r": session.selectTool(.blur)
             case "c": session.selectTool(.crop)

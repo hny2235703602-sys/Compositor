@@ -56,9 +56,6 @@ final class BrushCursorOverlay: NSView {
                 context.endTransparencyLayer()
                 context.restoreGState()
             }
-            context.setStrokeColor(NSColor.white.cgColor)
-            context.setLineWidth(2.5)
-            context.strokeEllipse(in: circle)
             context.setStrokeColor(NSColor.black.cgColor)
             context.setLineWidth(1)
             context.strokeEllipse(in: circle)
@@ -66,9 +63,6 @@ final class BrushCursorOverlay: NSView {
                 let inset = circle.width * (1 - hardness) / 2
                 let inner = circle.insetBy(dx: inset, dy: inset)
                 context.setLineDash(phase: 0, lengths: [4, 3])
-                context.setStrokeColor(NSColor.white.cgColor)
-                context.setLineWidth(2.5)
-                context.strokeEllipse(in: inner)
                 context.setStrokeColor(NSColor.black.cgColor)
                 context.setLineWidth(1)
                 context.strokeEllipse(in: inner)

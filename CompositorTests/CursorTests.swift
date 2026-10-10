@@ -241,4 +241,29 @@ struct CursorTests {
         table.mouseMoved(with: mouse(at: name, in: window))
         #expect(NSCursor.current === NSCursor.arrow)
     }
+
+    /// A brush-sized tool shows its radius as a circle. The crosshair would hide how far a stroke reaches.
+    @Test func brushToolsUseTheRadiusCircleInsteadOfTheCrosshair() {
+        let session = EditorSession()
+        session.createDocument(width: 400, height: 300)
+        session.brushSettings.diameter = 80
+        let view = CanvasView(session: session)
+        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 400, height: 300), styleMask: [.titled],
+                              backing: .buffered, defer: false)
+        window.contentView = view
+        defer { NSCursor.arrow.set() }
+        let over = mouse(at: NSPoint(x: 200, y: 150), in: window)
+        for tool in [NavigationTool.brush, .spotHealing, .blur, .cloneStamp] {
+            session.selectTool(tool)
+            view.synchronizeDisplay()
+            NSCursor.crosshair.set()
+            view.mouseMoved(with: over)
+            #expect(NSCursor.current === CanvasView.hiddenCursor, "\(tool): the radius circle stands in for the crosshair")
+            view.cursorUpdate(with: over)
+            #expect(NSCursor.current === CanvasView.hiddenCursor, "\(tool): a cursor update keeps the circle")
+        }
+        session.selectTool(.cloneStamp)
+        view.mouseMoved(with: mouse(at: NSPoint(x: 200, y: 150), flags: .option, in: window))
+        #expect(NSCursor.current === NSCursor.crosshair, "Option with Clone Stamp places the source with the crosshair")
+    }
 }
