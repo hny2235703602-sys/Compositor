@@ -74,7 +74,11 @@ final class CompositorApplicationDelegate: NSObject, NSApplicationDelegate {
             guard let menu = note.object as? NSMenu, let index = note.userInfo?["NSMenuItemIndex"] as? Int else { return }
             MainActor.assumeIsolated { Self.removeIfSystemExtra(at: index, in: menu) }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [updater] in updater.startUpdater() }
+        // The feed is the upstream appcast. Automatic checks stay off so a later release cannot replace this fork.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [updater] in
+            updater.updater.automaticallyChecksForUpdates = false
+            updater.startUpdater()
+        }
     }
 
     /// Black over everything but the window's inside in Canvas Only: the screen around it, its rounded corners and the

@@ -92,9 +92,6 @@ struct CompositorApp: App {
                 }
                 // Grouped: a commands builder takes at most ten items.
                 Group {
-                    CommandGroup(after: .appInfo) {
-                        Button("Check for Updates…") { applicationDelegate.updater.checkForUpdates(nil) }
-                    }
                     CommandGroup(after: .toolbar) {
                         Button("Search Commands…") {
                             CommandPaletteController.shared.toggle(session: session, over: applicationDelegate.projects.window)
