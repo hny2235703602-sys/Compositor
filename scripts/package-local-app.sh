@@ -1,24 +1,57 @@
 #!/bin/sh
-# Builds a self-contained Compositor.app, signed locally, and copies it to the Desktop.
-# Not notarized and not for distribution. The assistant's network helper is a second
-# executable in the bundle so a crash there does not take the editor with it.
+# Build a Compositor.app this Mac can open, and put it on the Desktop.
+# The signature is ad-hoc: not notarized, and not something to give to another Mac.
+# Someone else clones the repo and runs this script on their own machine.
 set -eu
 cd "$(dirname "$0")/.."
-DD="${COMPOSITOR_DD:-/Users/apple/Compositor-dd2}"
-xcodebuild -project Compositor.xcodeproj -scheme Compositor -configuration Release \
-  -destination 'platform=macOS,arch=arm64' -derivedDataPath "$DD" build \
-  CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= CODE_SIGNING_ALLOWED=YES
-APP="$DD/Build/Products/Release/Compositor.app"
-if ! { test -x "$APP/Contents/MacOS/Compositor" && test -d "$APP/Contents/Resources"; }; then
-  echo "Compositor.app at $APP is not a complete build" >&2
+root=$(pwd)
+dd="${COMPOSITOR_DD:-$root/DerivedData}"
+
+if ! command -v xcodebuild >/dev/null 2>&1; then
+  echo "Xcode is required. Install it, then run this script again." >&2
   exit 1
 fi
-HELPER="$APP/Contents/MacOS/AIPanelWorker"
-test -x "$HELPER" || { echo "AIPanelWorker missing from bundle"; exit 1; }
-codesign --force --sign - --entitlements Config/Compositor.entitlements "$APP"
-codesign --verify --deep --strict "$APP"
-codesign -d --entitlements - "$APP" 2>&1 | grep -q 'com.apple.security.network.client'
-DEST="$HOME/Desktop/Compositor.app"
-[ -d "$DEST" ] && mv "$DEST" "$DEST.bak-$(date +%s)"
-ditto "$APP" "$DEST"
-echo "Packaged $DEST"
+
+xcodebuild -project Compositor.xcodeproj -scheme Compositor \
+  -configuration Release -destination 'platform=macOS,arch=arm64' \
+  -skipPackagePluginValidation -derivedDataPath "$dd" \
+  CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= \
+  build
+
+app="$dd/Build/Products/Release/Compositor.app"
+test -x "$app/Contents/MacOS/Compositor" || { echo "The build did not produce Compositor." >&2; exit 1; }
+test -x "$app/Contents/MacOS/AIPanelWorker" || { echo "AIPanelWorker is missing from the bundle." >&2; exit 1; }
+test -f "$app/Contents/Resources/Looks.json" || { echo "Looks.json is missing from the bundle." >&2; exit 1; }
+test -f "$app/Contents/Resources/Knowledge.json" || { echo "Knowledge.json is missing from the bundle." >&2; exit 1; }
+
+# Release turns on the hardened runtime. An ad-hoc signature has no team, so
+# dyld then refuses to load Sparkle. Sign again without that flag. Sandbox and
+# network access stay in the entitlements file. Nothing is copied yet.
+codesign --force --sign - --timestamp=none \
+  --entitlements Config/Compositor.entitlements "$app"
+codesign --verify --deep --strict "$app"
+codesign -d --entitlements - "$app" 2>&1 | grep -q 'com.apple.security.network.client'
+
+log=$(mktemp)
+"$app/Contents/MacOS/Compositor" >"$log" 2>&1 &
+pid=$!
+sleep 2
+if ! kill -0 "$pid" 2>/dev/null; then
+  echo "The app quit at launch:" >&2
+  cat "$log" >&2
+  rm -f "$log"
+  exit 1
+fi
+kill "$pid" 2>/dev/null || true
+wait "$pid" 2>/dev/null || true
+rm -f "$log"
+
+dest="$HOME/Desktop/Compositor.app"
+if [ -d "$dest" ]; then
+  bak="$dest.bak-$(date +%s)"
+  mv "$dest" "$bak"
+  echo "Moved the previous app to $bak"
+fi
+ditto "$app" "$dest"
+echo "Packaged $dest"
+open "$dest"
